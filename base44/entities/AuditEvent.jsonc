@@ -1,0 +1,67 @@
+{
+  "name": "AuditEvent",
+  "type": "object",
+  "properties": {
+    "user_id": {
+      "type": "string",
+      "description": "Reference to the user who triggered the event"
+    },
+    "workspace_id": {
+      "type": "string",
+      "description": "Reference to the workspace"
+    },
+    "conversation_id": {
+      "type": "string",
+      "description": "Reference to the conversation"
+    },
+    "event_type": {
+      "type": "string",
+      "enum": [
+        "agent_invocation",
+        "model_call",
+        "memory_operation",
+        "tool_call",
+        "error"
+      ],
+      "description": "Type of auditable event"
+    },
+    "agent_type": {
+      "type": "string",
+      "description": "Which agent was involved \u2014 orchestrator, memory, context, research"
+    },
+    "model_used": {
+      "type": "string",
+      "description": "Which AI model was used"
+    },
+    "task_type": {
+      "type": "string",
+      "description": "How the task was classified"
+    },
+    "token_count": {
+      "type": "integer",
+      "description": "Estimated token count for the operation",
+      "default": 0
+    },
+    "latency_ms": {
+      "type": "integer",
+      "description": "Response latency in milliseconds",
+      "default": 0
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "success",
+        "error"
+      ],
+      "description": "Whether the operation succeeded",
+      "default": "success"
+    },
+    "error_message": {
+      "type": "string",
+      "description": "Error details if status is error"
+    }
+  },
+  "required": [
+    "event_type"
+  ]
+}

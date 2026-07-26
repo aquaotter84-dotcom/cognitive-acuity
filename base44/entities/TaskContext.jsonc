@@ -1,0 +1,91 @@
+{
+  "name": "TaskContext",
+  "type": "object",
+  "properties": {
+    "conversation_id": {
+      "type": "string",
+      "description": "Reference to the conversation this task context belongs to"
+    },
+    "workspace_id": {
+      "type": "string",
+      "description": "Reference to the workspace"
+    },
+    "goal": {
+      "type": "string",
+      "description": "The high-level objective decomposed by the orchestrator"
+    },
+    "task_type": {
+      "type": "string",
+      "enum": [
+        "conversation",
+        "question_answering",
+        "research",
+        "planning",
+        "coding",
+        "analysis",
+        "creative",
+        "decision_support",
+        "action_execution"
+      ],
+      "description": "Classified task type from the reasoning engine"
+    },
+    "sub_tasks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "agent": {
+            "type": "string",
+            "description": "Which agent handles this sub-task"
+          },
+          "description": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "in_progress",
+              "complete",
+              "error"
+            ]
+          },
+          "input": {
+            "type": "string"
+          },
+          "output": {
+            "type": "string"
+          }
+        }
+      },
+      "description": "Decomposed sub-tasks with agent assignments and results"
+    },
+    "context_assembled": {
+      "type": "string",
+      "description": "The assembled context prompt sent to the model"
+    },
+    "final_response": {
+      "type": "string",
+      "description": "The synthesized final response from the orchestrator"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "in_progress",
+        "complete",
+        "error"
+      ],
+      "description": "Overall task status",
+      "default": "in_progress"
+    }
+  },
+  "required": [
+    "conversation_id",
+    "workspace_id",
+    "goal"
+  ]
+}

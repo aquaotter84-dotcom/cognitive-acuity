@@ -1,0 +1,85 @@
+{
+  "name": "Message",
+  "type": "object",
+  "properties": {
+    "conversation_id": {
+      "type": "string",
+      "description": "Reference to the conversation this message belongs to"
+    },
+    "workspace_id": {
+      "type": "string",
+      "description": "Reference to the workspace for direct querying"
+    },
+    "role": {
+      "type": "string",
+      "enum": [
+        "user",
+        "assistant",
+        "system"
+      ],
+      "description": "The role of the message sender"
+    },
+    "content": {
+      "type": "string",
+      "description": "The message text content"
+    },
+    "model_used": {
+      "type": "string",
+      "description": "The AI model that generated this response"
+    },
+    "task_type": {
+      "type": "string",
+      "enum": [
+        "conversation",
+        "question_answering",
+        "research",
+        "planning",
+        "coding",
+        "analysis",
+        "creative",
+        "decision_support",
+        "action_execution"
+      ],
+      "description": "How the orchestrator classified this task"
+    },
+    "task_context_id": {
+      "type": "string",
+      "description": "Reference to the TaskContext if a multi-agent task was created"
+    },
+    "attachments": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "file_url": {
+            "type": "string"
+          },
+          "file_type": {
+            "type": "string"
+          }
+        }
+      },
+      "description": "Files attached to this message"
+    },
+    "processing_status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "processing",
+        "complete",
+        "error"
+      ],
+      "description": "Processing status of the message",
+      "default": "complete"
+    }
+  },
+  "required": [
+    "conversation_id",
+    "workspace_id",
+    "role",
+    "content"
+  ]
+}

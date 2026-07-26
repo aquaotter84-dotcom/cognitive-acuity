@@ -1,0 +1,36 @@
+{
+  "name": "Workspace",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Display name of the workspace"
+    },
+    "description": {
+      "type": "string",
+      "description": "Optional description of the workspace purpose"
+    },
+    "instructions": {
+      "type": "string",
+      "description": "Workspace-level system instructions that shape AI behavior"
+    },
+    "color": {
+      "type": "string",
+      "description": "Accent color hex code for visual identification",
+      "default": "#3B82F6"
+    },
+    "icon": {
+      "type": "string",
+      "description": "Lucide icon name for the workspace",
+      "default": "Brain"
+    },
+    "is_default": {
+      "type": "boolean",
+      "description": "Whether this is the user's default workspace",
+      "default": false
+    }
+  },
+  "required": [
+    "name"
+  ]
+}

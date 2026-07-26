@@ -1,0 +1,36 @@
+{
+  "name": "Conversation",
+  "type": "object",
+  "properties": {
+    "title": {
+      "type": "string",
+      "description": "Conversation title shown in sidebar"
+    },
+    "workspace_id": {
+      "type": "string",
+      "description": "Reference to the workspace this conversation belongs to"
+    },
+    "summary": {
+      "type": "string",
+      "description": "Auto-generated conversation summary for context"
+    },
+    "is_archived": {
+      "type": "boolean",
+      "description": "Whether the conversation is archived",
+      "default": false
+    },
+    "last_message_preview": {
+      "type": "string",
+      "description": "Preview text of the last message for sidebar display"
+    },
+    "message_count": {
+      "type": "integer",
+      "description": "Total number of messages in this conversation",
+      "default": 0
+    }
+  },
+  "required": [
+    "title",
+    "workspace_id"
+  ]
+}

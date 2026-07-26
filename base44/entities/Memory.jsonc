@@ -1,0 +1,51 @@
+{
+  "name": "Memory",
+  "type": "object",
+  "properties": {
+    "workspace_id": {
+      "type": "string",
+      "description": "Reference to the workspace this memory belongs to"
+    },
+    "content": {
+      "type": "string",
+      "description": "The memory content \u2014 a fact, preference, or important detail"
+    },
+    "memory_type": {
+      "type": "string",
+      "enum": [
+        "working",
+        "episodic",
+        "semantic"
+      ],
+      "description": "Level of memory: working (temporary), episodic (events), semantic (stable knowledge)",
+      "default": "episodic"
+    },
+    "source": {
+      "type": "string",
+      "description": "Origin of the memory \u2014 conversation ID or manual entry"
+    },
+    "importance": {
+      "type": "integer",
+      "description": "Importance score 1-10",
+      "default": 5,
+      "minimum": 1,
+      "maximum": 10
+    },
+    "is_enabled": {
+      "type": "boolean",
+      "description": "Whether this memory is active and used in context",
+      "default": true
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Tags for categorizing and searching memories"
+    }
+  },
+  "required": [
+    "workspace_id",
+    "content"
+  ]
+}
