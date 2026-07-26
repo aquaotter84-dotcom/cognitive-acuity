@@ -26,46 +26,6 @@ export default function Chat() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isProcessing]);
 
-  const extractMemories = async (convId, userText, aiResponse) => {
-    try {
-      const result = await base44.integrations.Core.InvokeLLM({
-        prompt: `Analyze this conversation exchange and extract any important facts, preferences, or information worth remembering for future conversations. Only extract genuinely useful, long-term information. Return empty array if nothing is worth remembering.\n\nUser: ${userText}\nAssistant: ${aiResponse}`,
-        model: 'gpt_5_mini',
-        response_json_schema: {
-          type: 'object',
-          properties: {
-            memories: {
-              type: 'array',
-              items: {
-                type: 'object',
-                properties: {
-                  content: { type: 'string' },
-                  memory_type: { type: 'string', enum: ['episodic', 'semantic'] },
-                  importance: { type: 'integer' }
-                }
-              }
-            }
-          }
-        }
-      });
-      if (result?.memories?.length > 0) {
-        const records = result.memories
-          .filter(m => m.content?.trim().length > 5)
-          .map(m => ({
-            workspace_id: activeWorkspace.id,
-            content: m.content.trim(),
-            memory_type: m.memory_type || 'episodic',
-            source: convId,
-            importance: m.importance || 5,
-            is_enabled: true
-          }));
-        if (records.length > 0) {
-          await base44.entities.Memory.bulkCreate(records);
-        }
-      }
-    } catch (_e) { /* best-effort */ }
-  };
-
   const handleSend = async (text) => {
     if (!activeWorkspace || isProcessing) return;
 
@@ -128,7 +88,6 @@ export default function Chat() {
       });
 
       refreshConversations();
-      extractMemories(convId, text, aiResponse);
     } catch (error) {
       const errorMsg = await base44.entities.Message.create({
         conversation_id: convId,
