@@ -89,11 +89,12 @@ export default function Chat() {
 
       refreshConversations();
     } catch (error) {
+      const errDetail = error?.data?.error || error?.message || 'Unknown error';
       const errorMsg = await base44.entities.Message.create({
         conversation_id: convId,
         workspace_id: activeWorkspace.id,
         role: 'assistant',
-        content: 'I encountered an error processing your request. Please try again.',
+        content: `⚠️ **Error:** ${errDetail}\n\nPlease check your API key in Settings or try again.`,
         processing_status: 'error'
       });
       setMessages(prev => [...prev, errorMsg]);
