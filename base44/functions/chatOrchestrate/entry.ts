@@ -62,7 +62,8 @@ Deno.serve(async (req) => {
       },
       body: JSON.stringify({
         model: 'openai/gpt-4o',
-        messages: chatMessages
+        messages: chatMessages,
+        max_tokens: 2000
       })
     });
 
@@ -94,6 +95,7 @@ Deno.serve(async (req) => {
               content: `User: ${userMessage}\nAssistant: ${responseText}`
             }
           ],
+          max_tokens: 500,
           response_format: { type: 'json_object' }
         })
       });
