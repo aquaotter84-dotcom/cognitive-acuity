@@ -36,8 +36,7 @@ export default function Chat() {
       const conv = await base44.entities.Conversation.create({
         title: text.slice(0, 50) + (text.length > 50 ? '...' : ''),
         workspace_id: activeWorkspace.id,
-        last_message_preview: text,
-        message_count: 1
+        last_message_preview: text
       });
       convId = conv.id;
       setActiveConversationId(convId);
@@ -55,8 +54,7 @@ export default function Chat() {
 
     if (!isNew) {
       await base44.entities.Conversation.update(convId, {
-        last_message_preview: text,
-        message_count: (messages.length + 1)
+        last_message_preview: text
       });
     }
 
@@ -83,8 +81,7 @@ export default function Chat() {
       setMessages(prev => [...prev, assistantMsg]);
 
       await base44.entities.Conversation.update(convId, {
-        last_message_preview: aiResponse.slice(0, 100),
-        message_count: (messages.length + 2)
+        last_message_preview: aiResponse.slice(0, 100)
       });
 
       refreshConversations();
