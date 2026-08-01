@@ -10,6 +10,11 @@
       "type": "string",
       "description": "Reference to the workspace"
     },
+    "description": {
+      "type": "string",
+      "description": "Optional human-readable description of this task context (up to 1000 characters)",
+      "maxLength": 1000
+    },
     "goal": {
       "type": "string",
       "description": "The high-level objective decomposed by the orchestrator. NOTE: TaskContext is currently dormant \u2014 no code reads or writes it yet. It will hold decomposed sub-tasks once the Council operators (Observer/Strategist/Critic/Governor) are implemented in Phase 2+. Kept here so the entity exists and is RLS-secured ahead of first use."

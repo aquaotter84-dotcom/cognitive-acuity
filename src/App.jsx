@@ -15,6 +15,9 @@ import Settings from '@/pages/Settings';
 import Activity from '@/pages/Activity';
 import Insights from '@/pages/Insights';
 import AgentChat from '@/pages/AgentChat';
+import About from '@/pages/About';
+import Contact from '@/pages/Contact';
+import PublicLayout from '@/components/PublicLayout';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -52,6 +55,10 @@ const AuthenticatedApp = () => {
           <Route path="/settings" element={<Settings />} />
           <Route path="/activity" element={<Activity />} />
         </Route>
+      </Route>
+      <Route element={<PublicLayout />}>
+        <Route path="/about" element={<About />} />
+        <Route path="/contact" element={<Contact />} />
       </Route>
       <Route path="*" element={<PageNotFound />} />
     </Routes>

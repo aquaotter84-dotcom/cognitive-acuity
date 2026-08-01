@@ -14,6 +14,11 @@
       "type": "string",
       "description": "Reference to the conversation"
     },
+    "description": {
+      "type": "string",
+      "description": "Optional human-readable description of this audit event (up to 1000 characters)",
+      "maxLength": 1000
+    },
     "event_type": {
       "type": "string",
       "enum": [
