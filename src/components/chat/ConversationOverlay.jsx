@@ -46,7 +46,7 @@ export default function ConversationOverlay({ phase, interim, onInterrupt, onEnd
         <p className="text-xs text-muted-foreground mb-2">Speak when ready</p>
       )}
       {phase === 'speaking' && (
-        <p className="text-xs text-muted-foreground mb-6">Tap the orb to interrupt</p>
+        <p className="text-xs text-muted-foreground mb-6">Tap the orb or start speaking to interrupt</p>
       )}
       {phase === 'processing' && (
         <p className="text-xs text-muted-foreground mb-6">COGNOS is reasoning…</p>
