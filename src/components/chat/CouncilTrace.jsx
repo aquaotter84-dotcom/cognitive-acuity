@@ -74,9 +74,19 @@ export default function CouncilTrace({ council }) {
           )}
           {Array.isArray(memoriesUsed) && memoriesUsed.length > 0 && (
             <Section title={`Memory (${memoriesUsed.length})`}>
-              {memoriesUsed.map(m => (
-                <p key={m.id} className="text-muted-foreground/80 leading-relaxed">• {m.preview}</p>
-              ))}
+              {memoriesUsed.map(m => {
+                const ev = m.evidence;
+                const evColor = ev === 'direct' ? 'text-green-400 bg-green-400/10'
+                  : ev === 'repeated' ? 'text-primary bg-primary/10'
+                  : ev === 'inferred' ? 'text-amber-400 bg-amber-400/10'
+                  : ev === 'assumed' ? 'text-red-400 bg-red-400/10' : '';
+                return (
+                  <div key={m.id} className="flex items-start gap-1.5">
+                    {ev && <span className={`mt-0.5 px-1 py-0.5 rounded text-[9px] font-medium uppercase shrink-0 ${evColor}`}>{ev}</span>}
+                    <p className="text-muted-foreground/80 leading-relaxed flex-1">{m.preview}</p>
+                  </div>
+                );
+              })}
             </Section>
           )}
           {classification && (

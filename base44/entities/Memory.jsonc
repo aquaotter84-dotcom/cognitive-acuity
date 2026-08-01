@@ -31,6 +31,32 @@
       "minimum": 1,
       "maximum": 10
     },
+    "evidence_level": {
+      "type": "string",
+      "enum": [
+        "direct",
+        "repeated",
+        "inferred",
+        "assumed"
+      ],
+      "description": "How this memory was established: direct (user stated it explicitly), repeated (stated across multiple exchanges), inferred (deduced from context), assumed (guessed without a clear basis). Makes memory auditable rather than a quiet accumulation of assumptions.",
+      "default": "direct"
+    },
+    "last_confirmed": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When this memory was last validated or confirmed against the user. Updated on extraction, manual edit, and consolidation."
+    },
+    "volatility": {
+      "type": "string",
+      "enum": [
+        "low",
+        "medium",
+        "high"
+      ],
+      "description": "How likely this memory is to become stale: low (name, identity, stable facts), medium (job, role, preferences), high (current project phase, living situation, in-progress state).",
+      "default": "medium"
+    },
     "is_enabled": {
       "type": "boolean",
       "description": "Whether this memory is active and used in context",

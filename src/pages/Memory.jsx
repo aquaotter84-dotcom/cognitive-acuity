@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Brain, Search, Plus, Trash2, Edit2, Check, X } from 'lucide-react';
+import moment from 'moment';
 import { base44 } from '@/api/base44Client';
 import { useCognos } from '@/lib/cognosContext';
 
@@ -9,12 +10,27 @@ const typeColors = {
   working: 'bg-amber-500/15 text-amber-400',
 };
 
+const evidenceColors = {
+  direct: 'bg-green-500/15 text-green-400',
+  repeated: 'bg-primary/15 text-primary',
+  inferred: 'bg-amber-500/15 text-amber-400',
+  assumed: 'bg-red-500/15 text-red-400',
+};
+
+const volatilityColors = {
+  low: 'bg-green-500/15 text-green-400',
+  medium: 'bg-amber-500/15 text-amber-400',
+  high: 'bg-red-500/15 text-red-400',
+};
+
 export default function Memory() {
   const { activeWorkspace } = useCognos();
   const [memories, setMemories] = useState([]);
   const [search, setSearch] = useState('');
   const [editingId, setEditingId] = useState(null);
   const [editContent, setEditContent] = useState('');
+  const [editEvidence, setEditEvidence] = useState('direct');
+  const [editVolatility, setEditVolatility] = useState('medium');
   const [isAdding, setIsAdding] = useState(false);
   const [newContent, setNewContent] = useState('');
 
@@ -48,7 +64,12 @@ export default function Memory() {
 
   const handleSaveEdit = async (id) => {
     if (!editContent.trim()) return;
-    await base44.entities.Memory.update(id, { content: editContent.trim() });
+    await base44.entities.Memory.update(id, {
+      content: editContent.trim(),
+      evidence_level: editEvidence,
+      volatility: editVolatility,
+      last_confirmed: new Date().toISOString()
+    });
     setEditingId(null);
     loadMemories();
   };
@@ -61,6 +82,9 @@ export default function Memory() {
       memory_type: 'semantic',
       source: 'manual',
       importance: 5,
+      evidence_level: 'direct',
+      volatility: 'medium',
+      last_confirmed: new Date().toISOString(),
       is_enabled: true
     });
     setNewContent('');
@@ -130,17 +154,33 @@ export default function Memory() {
                       className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent/50 resize-none"
                       autoFocus
                     />
-                    <div className="flex justify-end gap-2 mt-2">
-                      <button onClick={() => setEditingId(null)} className="p-1.5 text-muted-foreground hover:text-foreground"><X className="w-4 h-4" /></button>
-                      <button onClick={() => handleSaveEdit(mem.id)} className="p-1.5 text-accent hover:text-accent/80"><Check className="w-4 h-4" /></button>
+                    <div className="flex gap-2 mt-2">
+                      <select value={editEvidence} onChange={(e) => setEditEvidence(e.target.value)} className="bg-background border border-border rounded-lg px-2 py-1 text-xs focus:outline-none focus:border-accent/50">
+                        <option value="direct">direct</option>
+                        <option value="repeated">repeated</option>
+                        <option value="inferred">inferred</option>
+                        <option value="assumed">assumed</option>
+                      </select>
+                      <select value={editVolatility} onChange={(e) => setEditVolatility(e.target.value)} className="bg-background border border-border rounded-lg px-2 py-1 text-xs focus:outline-none focus:border-accent/50">
+                        <option value="low">low</option>
+                        <option value="medium">medium</option>
+                        <option value="high">high</option>
+                      </select>
+                      <div className="flex justify-end gap-2 ml-auto">
+                        <button onClick={() => setEditingId(null)} className="p-1.5 text-muted-foreground hover:text-foreground"><X className="w-4 h-4" /></button>
+                        <button onClick={() => handleSaveEdit(mem.id)} className="p-1.5 text-accent hover:text-accent/80"><Check className="w-4 h-4" /></button>
+                      </div>
                     </div>
                   </div>
                 ) : (
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
+                      <div className="flex items-center gap-1.5 mb-1 flex-wrap">
                         <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${typeColors[mem.memory_type] || typeColors.episodic}`}>{mem.memory_type}</span>
-                        <span className="text-xs text-muted-foreground">Importance: {mem.importance}/10</span>
+                        {mem.evidence_level && <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${evidenceColors[mem.evidence_level] || ''}`}>{mem.evidence_level}</span>}
+                        {mem.volatility && <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${volatilityColors[mem.volatility] || ''}`}>vol: {mem.volatility}</span>}
+                        <span className="text-xs text-muted-foreground">imp {mem.importance}/10</span>
+                        {mem.last_confirmed && <span className="text-xs text-muted-foreground/70">confirmed {moment(mem.last_confirmed).fromNow()}</span>}
                       </div>
                       <p className="text-sm">{mem.content}</p>
                     </div>
@@ -148,7 +188,7 @@ export default function Memory() {
                       <button onClick={() => handleToggle(mem)} className={`w-9 h-5 rounded-full transition-colors ${mem.is_enabled ? 'bg-accent' : 'bg-muted'}`}>
                         <span className={`block w-4 h-4 rounded-full bg-white transition-transform ${mem.is_enabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
                       </button>
-                      <button onClick={() => { setEditingId(mem.id); setEditContent(mem.content); }} className="p-1.5 text-muted-foreground hover:text-foreground"><Edit2 className="w-3.5 h-3.5" /></button>
+                      <button onClick={() => { setEditingId(mem.id); setEditContent(mem.content); setEditEvidence(mem.evidence_level || 'direct'); setEditVolatility(mem.volatility || 'medium'); }} className="p-1.5 text-muted-foreground hover:text-foreground"><Edit2 className="w-3.5 h-3.5" /></button>
                       <button onClick={() => handleDelete(mem.id)} className="p-1.5 text-muted-foreground hover:text-destructive"><Trash2 className="w-3.5 h-3.5" /></button>
                     </div>
                   </div>

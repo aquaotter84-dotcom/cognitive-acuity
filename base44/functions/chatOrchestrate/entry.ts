@@ -24,7 +24,9 @@ const MEMORY_SCHEMA = {
         properties: {
           content: { type: "string" },
           memory_type: { type: "string" },
-          importance: { type: "integer" }
+          importance: { type: "integer" },
+          evidence_level: { type: "string" },
+          volatility: { type: "string" }
         }
       }
     }
@@ -172,7 +174,7 @@ async function handle(req) {
           messages: [
             {
               role: "system",
-              content: 'You are a memory extraction agent. Analyze the conversation and extract any important facts, preferences, or information worth remembering for future conversations. Only extract genuinely useful, long-term information — not casual conversation. Return a memories array; each memory has content (string), memory_type ("episodic" or "semantic"), and importance (1-10 integer). Return an empty array if nothing is worth remembering.'
+              content: 'You are a memory extraction agent. Analyze the conversation and extract any important facts, preferences, or information worth remembering for future conversations. Only extract genuinely useful, long-term information — not casual conversation. For each memory, also classify: evidence_level — "direct" (the user explicitly stated it), "repeated" (stated across multiple exchanges), "inferred" (deduced from context), or "assumed" (guessed without a clear basis, use sparingly); and volatility — "low" (name, identity, stable facts), "medium" (job, role, preferences), or "high" (current project phase, living situation, in-progress state that changes often). Be honest about evidence: prefer "direct" only when the user clearly stated it, and "assumed" only when you are guessing. Return a memories array; each memory has content (string), memory_type ("episodic" or "semantic"), importance (1-10 integer), evidence_level (string), and volatility (string). Return an empty array if nothing is worth remembering.'
             },
             { role: "user", content: `User: ${userMessage}\nAssistant: ${responseText}` }
           ]
@@ -186,6 +188,9 @@ async function handle(req) {
               memory_type: m.memory_type || 'episodic',
               source: conversationId,
               importance: m.importance || 5,
+              evidence_level: ['direct', 'repeated', 'inferred', 'assumed'].includes(m.evidence_level) ? m.evidence_level : 'inferred',
+              volatility: ['low', 'medium', 'high'].includes(m.volatility) ? m.volatility : 'medium',
+              last_confirmed: new Date().toISOString(),
               is_enabled: true
             }));
           if (records.length > 0) {
@@ -354,7 +359,7 @@ async function handle(req) {
     latencyMs,
     summary: conversationSummary,
     council: {
-      memoriesUsed: (contextResult.memories || []).map(m => ({ id: m.id, preview: String(m.content || '').slice(0, 120) })),
+      memoriesUsed: (contextResult.memories || []).map(m => ({ id: m.id, preview: String(m.content || '').slice(0, 120), evidence: m.evidence_level || null, volatility: m.volatility || null })),
       classification: observerResult.classification,
       plan: strategistResult.plan,
       taskContextId: strategistResult.taskContext?.id || null,

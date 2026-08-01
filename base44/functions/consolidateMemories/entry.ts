@@ -11,6 +11,28 @@ import { wrapHandler } from "../../shared/errors.ts";
 
 const logger = createLogger("consolidateMemories");
 
+// Evidence and volatility ranking — when merging overlapping memories, the merged
+// record inherits the strongest evidence and highest volatility of its sources, and
+// the latest last_confirmed timestamp. Keeps consolidated memory auditable.
+const EVIDENCE_RANK = { direct: 3, repeated: 2, inferred: 1, assumed: 0 };
+const VOLATILITY_RANK = { high: 2, medium: 1, low: 0 };
+
+function pickStrongest(items, field, rank, fallback) {
+  let best = fallback;
+  let bestRank = -1;
+  for (const m of items) {
+    const v = m[field];
+    const r = v != null ? (rank[v] ?? -1) : -1;
+    if (v && r > bestRank) { best = v; bestRank = r; }
+  }
+  return best;
+}
+
+function pickLatestDate(items, field) {
+  const dates = items.map(m => m[field]).filter(Boolean).sort();
+  return dates.length ? dates[dates.length - 1] : null;
+}
+
 const CONSOLIDATION_SCHEMA = {
   type: "object",
   properties: {
@@ -72,12 +94,19 @@ async function consolidateWorkspace(base44, workspaceId) {
   for (const g of groups) {
     const ids = g.ids.filter(id => validIds.has(id));
     if (ids.length < 2) continue;
+    const sources = memories.filter(m => ids.includes(m.id));
+    const evidence_level = pickStrongest(sources, "evidence_level", EVIDENCE_RANK, "inferred");
+    const volatility = pickStrongest(sources, "volatility", VOLATILITY_RANK, "medium");
+    const last_confirmed = pickLatestDate(sources, "last_confirmed");
     await base44.asServiceRole.entities.Memory.create({
       workspace_id: workspaceId,
       content: String(g.merged_content).trim(),
       memory_type: g.memory_type === "episodic" ? "episodic" : "semantic",
       source: "consolidation",
       importance: g.importance || 5,
+      evidence_level,
+      volatility,
+      last_confirmed,
       is_enabled: true
     });
     created++;
