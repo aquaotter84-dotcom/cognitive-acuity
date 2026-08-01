@@ -5,7 +5,7 @@ import { useCognos } from '@/lib/cognosContext';
 import { base44 } from '@/api/base44Client';
 import { Image } from '@/components/ui/image';
 
-const COGNOS_LOGO = 'https://media.base44.com/images/public/6a65b5729b2fe6a520a0ab97/27ffd8237_copilot_image_1785559515375.jpeg';
+const COGNOS_LOGO = 'https://media.base44.com/images/public/6a65b5729b2fe6a520a0ab97/33193cff0_33519d65130b52f40ef3a4c45c04ff98d2430b231b5b15abfd0b3170de405f121.jpg';
 
 export default function Sidebar({ onNavigate }) {
   const { activeWorkspace, setActiveWorkspace, conversations, activeConversationId, setActiveConversationId } = useCognos();

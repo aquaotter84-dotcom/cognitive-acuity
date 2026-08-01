@@ -1,7 +1,7 @@
 import { Sparkles, BookOpen, Lightbulb, Code } from 'lucide-react';
 import { Image } from '@/components/ui/image';
 
-const COGNOS_LOGO = 'https://media.base44.com/images/public/6a65b5729b2fe6a520a0ab97/27ffd8237_copilot_image_1785559515375.jpeg';
+const COGNOS_LOGO = 'https://media.base44.com/images/public/6a65b5729b2fe6a520a0ab97/33193cff0_33519d65130b52f40ef3a4c45c04ff98d2430b231b5b15abfd0b3170de405f121.jpg';
 
 const suggestions = [
   { icon: Sparkles, title: 'Brainstorm ideas', text: 'Help me brainstorm ideas for a new project' },
