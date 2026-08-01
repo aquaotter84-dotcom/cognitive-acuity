@@ -331,14 +331,17 @@ async function handle(req) {
   });
   const governorResult = await orchestrator.dispatch("governor", governorMsg, ctx);
 
-  // --- Post-response stages (best-effort, awaited to preserve prior ordering) ---
+  // --- Post-response stages (best-effort, run concurrently) ---
+  // Memory extraction, audit logging, and summarization do not affect the
+  // response text. Running them concurrently (instead of serially) cuts the
+  // post-response tail to the slowest of the three, while still awaiting the
+  // batch so all three are guaranteed to complete before the function returns
+  // (memories, audit, and summary are core COGNOS functionality — not dropped).
   const memMsg = createMessage({
     type: "memory.request",
     from: "orchestrator",
     content: { workspaceId, conversationId, userMessage, responseText: currentResponse.responseText, memberIds: contextResult.workspace?.member_ids || [] }
   });
-  await orchestrator.dispatch("memoryExtraction", memMsg, ctx);
-
   const auditMsg = createMessage({
     type: "audit.request",
     from: "orchestrator",
@@ -352,13 +355,15 @@ async function handle(req) {
       status: "success"
     }
   });
-  await orchestrator.dispatch("auditLog", auditMsg, ctx);
-
-  // --- Phase 9: conversation summarization (best-effort) ---
-  let conversationSummary = null;
-  if (ctx.config.orchestrator.summaryEnabled !== false) {
-    conversationSummary = await summarizeConversation(ctx, conversationId, contextResult.history, userMessage, currentResponse.responseText);
-  }
+  const summaryEnabled = ctx.config.orchestrator.summaryEnabled !== false;
+  const [, , summaryResult] = await Promise.allSettled([
+    orchestrator.dispatch("memoryExtraction", memMsg, ctx),
+    orchestrator.dispatch("auditLog", auditMsg, ctx),
+    summaryEnabled
+      ? summarizeConversation(ctx, conversationId, contextResult.history, userMessage, currentResponse.responseText)
+      : Promise.resolve(null)
+  ]);
+  const conversationSummary = summaryResult.status === "fulfilled" ? summaryResult.value : null;
 
   await eventBus.publish("orchestration.complete", { latencyMs });
 
