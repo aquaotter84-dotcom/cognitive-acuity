@@ -13,6 +13,8 @@ import Memory from '@/pages/Memory';
 import Workspaces from '@/pages/Workspaces';
 import Settings from '@/pages/Settings';
 import Activity from '@/pages/Activity';
+import Insights from '@/pages/Insights';
+import AgentChat from '@/pages/AgentChat';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -44,6 +46,8 @@ const AuthenticatedApp = () => {
         <Route element={<CognosLayout />}>
           <Route path="/" element={<Chat />} />
           <Route path="/memory" element={<Memory />} />
+          <Route path="/insights" element={<Insights />} />
+          <Route path="/agent" element={<AgentChat />} />
           <Route path="/workspaces" element={<Workspaces />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/activity" element={<Activity />} />

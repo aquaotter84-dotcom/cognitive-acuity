@@ -1,0 +1,115 @@
+{
+  "name": "Insight",
+  "type": "object",
+  "properties": {
+    "workspace_id": {
+      "type": "string",
+      "description": "Reference to the workspace this insight belongs to"
+    },
+    "title": {
+      "type": "string",
+      "description": "Short title \u2014 typically the first line of the council's deliberation output"
+    },
+    "content": {
+      "type": "string",
+      "description": "The full autonomous council deliberation output (markdown)"
+    },
+    "trigger_type": {
+      "type": "string",
+      "enum": [
+        "scheduled",
+        "manual"
+      ],
+      "description": "How this insight was generated: scheduled (autonomous daily briefing) or manual (user-requested deliberation)",
+      "default": "manual"
+    },
+    "topic": {
+      "type": "string",
+      "description": "The goal/prompt the autonomous council reasoned about"
+    },
+    "task_type": {
+      "type": "string",
+      "enum": [
+        "conversation",
+        "question_answering",
+        "research",
+        "planning",
+        "coding",
+        "analysis",
+        "creative",
+        "decision_support",
+        "action_execution"
+      ],
+      "description": "Council task classification from the Observer"
+    },
+    "model_used": {
+      "type": "string",
+      "description": "Which AI model produced the deliberation"
+    },
+    "council": {
+      "type": "object",
+      "description": "Council trace: classification, plan, critic evaluation, revisions, governor verdict",
+      "properties": {}
+    },
+    "is_read": {
+      "type": "boolean",
+      "description": "Whether the user has opened/dismissed this insight",
+      "default": false
+    },
+    "member_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "User ids who can see this insight (copied from the workspace at creation). RLS enforces member visibility.",
+      "default": []
+    }
+  },
+  "required": [
+    "workspace_id",
+    "title",
+    "content",
+    "trigger_type"
+  ],
+  "rls": {
+    "read": {
+      "$or": [
+        {
+          "created_by_id": "{{user.id}}"
+        },
+        {
+          "data.member_ids": "{{user.id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "update": {
+      "$or": [
+        {
+          "created_by_id": "{{user.id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "delete": {
+      "$or": [
+        {
+          "created_by_id": "{{user.id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    }
+  }
+}
