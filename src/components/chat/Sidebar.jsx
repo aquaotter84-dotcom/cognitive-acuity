@@ -3,6 +3,9 @@ import { Link } from 'react-router-dom';
 import { Brain, Plus, Search, FolderKanban, Settings as SettingsIcon, Activity as ActivityIcon } from 'lucide-react';
 import { useCognos } from '@/lib/cognosContext';
 import { base44 } from '@/api/base44Client';
+import { Image } from '@/components/ui/image';
+
+const COGNOS_LOGO = 'https://media.base44.com/images/public/6a65b5729b2fe6a520a0ab97/27ffd8237_copilot_image_1785559515375.jpeg';
 
 export default function Sidebar({ onNavigate }) {
   const { activeWorkspace, setActiveWorkspace, conversations, activeConversationId, setActiveConversationId } = useCognos();
@@ -29,11 +32,13 @@ export default function Sidebar({ onNavigate }) {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="px-4 py-4 flex items-center gap-2">
-        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center">
-          <Brain className="w-5 h-5 text-white" />
-        </div>
-        <span className="text-lg font-bold tracking-tight">COGNOS</span>
+      <div className="px-4 py-4 flex items-center">
+        <Image
+          src={COGNOS_LOGO}
+          fittingType="fit"
+          className="h-9 w-24 mix-blend-screen"
+          alt="COGNOS"
+        />
       </div>
 
       <div className="px-3 pb-3">

@@ -1,4 +1,7 @@
-import { Brain, Sparkles, BookOpen, Lightbulb, Code } from 'lucide-react';
+import { Sparkles, BookOpen, Lightbulb, Code } from 'lucide-react';
+import { Image } from '@/components/ui/image';
+
+const COGNOS_LOGO = 'https://media.base44.com/images/public/6a65b5729b2fe6a520a0ab97/27ffd8237_copilot_image_1785559515375.jpeg';
 
 const suggestions = [
   { icon: Sparkles, title: 'Brainstorm ideas', text: 'Help me brainstorm ideas for a new project' },
@@ -10,9 +13,12 @@ const suggestions = [
 export default function WelcomeScreen({ onSuggestion }) {
   return (
     <div className="flex flex-col items-center justify-center h-full px-4 animate-fade-in">
-      <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-accent flex items-center justify-center mb-6">
-        <Brain className="w-9 h-9 text-white" />
-      </div>
+      <Image
+        src={COGNOS_LOGO}
+        fittingType="fit"
+        className="w-40 h-40 mb-6 mix-blend-screen"
+        alt="COGNOS"
+      />
       <h1 className="text-2xl font-bold tracking-tight mb-2">Welcome to COGNOS</h1>
       <p className="text-sm text-muted-foreground mb-8 text-center max-w-md">
         Your intelligent AI reasoning assistant. Start a conversation or try one of the suggestions below.
