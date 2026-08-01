@@ -7,7 +7,7 @@ import ChatInput from '@/components/chat/ChatInput';
 import WelcomeScreen from '@/components/chat/WelcomeScreen';
 
 export default function Chat() {
-  const { activeWorkspace, activeConversationId, setActiveConversationId, refreshConversations, openSidebar } = useCognos();
+  const { activeWorkspace, currentUser, activeConversationId, setActiveConversationId, refreshConversations, openSidebar } = useCognos();
   const [messages, setMessages] = useState([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [councilTraces, setCouncilTraces] = useState({});
@@ -37,12 +37,14 @@ export default function Chat() {
 
     let convId = activeConversationId;
     let isNew = false;
+    const memberIds = activeWorkspace.member_ids?.length ? activeWorkspace.member_ids : [currentUser.id];
 
     if (!convId) {
       const conv = await base44.entities.Conversation.create({
         title: text.slice(0, 50) + (text.length > 50 ? '...' : ''),
         workspace_id: activeWorkspace.id,
-        last_message_preview: text
+        last_message_preview: text,
+        member_ids: memberIds
       });
       convId = conv.id;
       setActiveConversationId(convId);
@@ -54,7 +56,8 @@ export default function Chat() {
       workspace_id: activeWorkspace.id,
       role: 'user',
       content: text,
-      processing_status: 'complete'
+      processing_status: 'complete',
+      member_ids: memberIds
     });
     setMessages(prev => [...prev, userMsg]);
 
@@ -82,7 +85,8 @@ export default function Chat() {
         content: aiResponse,
         model_used: modelUsed,
         task_type: taskType,
-        processing_status: 'complete'
+        processing_status: 'complete',
+        member_ids: memberIds
       });
       setMessages(prev => [...prev, assistantMsg]);
       if (council) {
@@ -102,7 +106,8 @@ export default function Chat() {
         workspace_id: activeWorkspace.id,
         role: 'assistant',
         content: `⚠️ **Error:** ${errDetail}\n\nPlease check your API key in Settings or try again.`,
-        processing_status: 'error'
+        processing_status: 'error',
+        member_ids: memberIds
       });
       setMessages(prev => [...prev, errorMsg]);
     } finally {

@@ -7,6 +7,7 @@ import MobileNav from '@/components/chat/MobileNav';
 
 export default function CognosLayout() {
   const [activeWorkspace, setActiveWorkspace] = useState(null);
+  const [currentUser, setCurrentUser] = useState(null);
   const [conversations, setConversations] = useState([]);
   const [activeConversationId, setActiveConversationId] = useState(null);
   const [isSidebarOpen, setSidebarOpen] = useState(false);
@@ -15,6 +16,8 @@ export default function CognosLayout() {
   useEffect(() => {
     (async () => {
       try {
+        const me = await base44.auth.me();
+        setCurrentUser(me);
         let workspaces = await base44.entities.Workspace.list();
         if (workspaces.length === 0) {
           const ws = await base44.entities.Workspace.create({
@@ -22,7 +25,9 @@ export default function CognosLayout() {
             description: 'Your default workspace',
             is_default: true,
             color: '#3B82F6',
-            icon: 'Brain'
+            icon: 'Brain',
+            member_ids: [me.id],
+            member_emails: [me.email]
           });
           workspaces = [ws];
         }
@@ -64,6 +69,7 @@ export default function CognosLayout() {
   return (
     <CognosContext.Provider value={{
       activeWorkspace, setActiveWorkspace,
+      currentUser,
       conversations, refreshConversations,
       activeConversationId, setActiveConversationId,
       openSidebar: () => setSidebarOpen(true),

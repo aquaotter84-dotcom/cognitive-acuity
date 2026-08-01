@@ -166,7 +166,7 @@ async function handle(req) {
     name: "memoryExtraction",
     type: "post",
     async handle(message, ctx) {
-      const { workspaceId, conversationId, userMessage, responseText } = message.content;
+      const { workspaceId, conversationId, userMessage, responseText, memberIds } = message.content;
       try {
         const memResult = await callLLM(ctx, {
           model: ctx.config.models.memory,
@@ -191,7 +191,8 @@ async function handle(req) {
               evidence_level: ['direct', 'repeated', 'inferred', 'assumed'].includes(m.evidence_level) ? m.evidence_level : 'inferred',
               volatility: ['low', 'medium', 'high'].includes(m.volatility) ? m.volatility : 'medium',
               last_confirmed: new Date().toISOString(),
-              is_enabled: true
+              is_enabled: true,
+              member_ids: memberIds && memberIds.length ? memberIds : [user.id]
             }));
           if (records.length > 0) {
             await ctx.base44.entities.Memory.bulkCreate(records);
@@ -325,7 +326,7 @@ async function handle(req) {
   const memMsg = createMessage({
     type: "memory.request",
     from: "orchestrator",
-    content: { workspaceId, conversationId, userMessage, responseText: currentResponse.responseText }
+    content: { workspaceId, conversationId, userMessage, responseText: currentResponse.responseText, memberIds: contextResult.workspace?.member_ids || [] }
   });
   await orchestrator.dispatch("memoryExtraction", memMsg, ctx);
 
