@@ -1,0 +1,44 @@
+{
+  "definition": {
+    "document": {
+      "dsl": "1.0.0",
+      "name": "memory_consolidation",
+      "version": "1.0",
+      "namespace": "base44"
+    },
+    "do": [
+      {
+        "consolidate": {
+          "call": "invoke_backend_function",
+          "with": {
+            "function_name": "consolidateMemories"
+          },
+          "then": "end",
+          "x-base44": {
+            "title": "Consolidate memories",
+            "description": "Merge near-duplicate memories"
+          }
+        }
+      }
+    ]
+  },
+  "name": "Memory Consolidation",
+  "trigger": {
+    "condition": null,
+    "config": {
+      "trigger_type": "scheduled",
+      "events": [],
+      "schedule_mode": "recurring",
+      "cron_expression": "0 3 * * *",
+      "one_time_date": null,
+      "timezone": "America/New_York",
+      "interval_value": null,
+      "interval_unit": null,
+      "interval_anchor": null,
+      "ends_type": "never",
+      "ends_on_date": null,
+      "ends_after_count": null
+    }
+  },
+  "description": "Consolidates near-duplicate memories across all workspaces daily at 3am"
+}

@@ -187,20 +187,49 @@ async function handle(req) {
   });
   const synthResult = await orchestrator.dispatch("synthesizer", synthMsg, ctx);
 
+  // --- Phase 4: critic-driven revision loop ---
+  // The Critic evaluates the synthesized response; if it flags the response as
+  // needing revision (needs_revision && score below threshold), the Synthesizer
+  // revises with the critique and is re-evaluated. Capped at maxRevisions.
+  let currentResponse = synthResult;
+  let criticResult = await orchestrator.dispatch("critic", createMessage({
+    type: "council.critique", from: "orchestrator", content: currentResponse
+  }), ctx);
+
+  const maxRevisions = ctx.config.council.maxRevisions || 0;
+  const revisionScoreThreshold = ctx.config.council.revisionScoreThreshold || 0;
+  let revisionCount = 0;
+  let revisionTriggered = false;
+
+  while (
+    maxRevisions > 0 &&
+    revisionCount < maxRevisions &&
+    criticResult.evaluation &&
+    !criticResult.evaluation.skipped &&
+    criticResult.evaluation.needs_revision === true &&
+    typeof criticResult.evaluation.score === "number" &&
+    criticResult.evaluation.score < revisionScoreThreshold
+  ) {
+    revisionTriggered = true;
+    revisionCount++;
+    const reviseMsg = createMessage({
+      type: "council.revise",
+      from: "orchestrator",
+      content: { ...currentResponse, critique: criticResult.evaluation, revision: true }
+    });
+    currentResponse = await orchestrator.dispatch("synthesizer", reviseMsg, ctx);
+    criticResult = await orchestrator.dispatch("critic", createMessage({
+      type: "council.critique", from: "orchestrator", content: currentResponse
+    }), ctx);
+  }
+
   const latencyMs = Date.now() - startTime;
 
-  // --- Phase 2: cognitive layer — critique & governance ---
-  const criticMsg = createMessage({
-    type: "council.critique",
-    from: "orchestrator",
-    content: synthResult
-  });
-  const criticResult = await orchestrator.dispatch("critic", criticMsg, ctx);
-
+  // --- Phase 2: cognitive layer — governance ---
   const governorMsg = createMessage({
     type: "council.govern",
     from: "orchestrator",
-    content: { responseText: synthResult.responseText }
+    content: { responseText: currentResponse.responseText }
   });
   const governorResult = await orchestrator.dispatch("governor", governorMsg, ctx);
 
@@ -208,7 +237,7 @@ async function handle(req) {
   const memMsg = createMessage({
     type: "memory.request",
     from: "orchestrator",
-    content: { workspaceId, conversationId, userMessage, responseText: synthResult.responseText }
+    content: { workspaceId, conversationId, userMessage, responseText: currentResponse.responseText }
   });
   await orchestrator.dispatch("memoryExtraction", memMsg, ctx);
 
@@ -219,8 +248,8 @@ async function handle(req) {
       userId: user.id,
       workspaceId,
       conversationId,
-      modelUsed: synthResult.modelUsed,
-      taskType: synthResult.taskType,
+      modelUsed: currentResponse.modelUsed,
+      taskType: currentResponse.taskType,
       latencyMs,
       status: "success"
     }
@@ -230,9 +259,9 @@ async function handle(req) {
   await eventBus.publish("orchestration.complete", { latencyMs });
 
   return Response.json({
-    response: synthResult.responseText,
-    taskType: synthResult.taskType,
-    modelUsed: synthResult.modelUsed,
+    response: currentResponse.responseText,
+    taskType: currentResponse.taskType,
+    modelUsed: currentResponse.modelUsed,
     latencyMs,
     council: {
       classification: observerResult.classification,
@@ -240,6 +269,7 @@ async function handle(req) {
       taskContextId: strategistResult.taskContext?.id || null,
       subTasks: specialistResult.subTaskOutputs || null,
       critic: criticResult.evaluation,
+      revisions: { count: revisionCount, triggered: revisionTriggered, maxRevisions },
       governor: { approved: governorResult.approved, flags: governorResult.flags }
     }
   });

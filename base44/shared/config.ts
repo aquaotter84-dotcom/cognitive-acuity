@@ -17,7 +17,9 @@ export function getSystemConfig() {
       strategistModel: "gpt_5_mini",
       criticModel: "gpt_5_mini",
       criticEnabled: true,
-      governorEnabled: true
+      governorEnabled: true,
+      maxRevisions: 1,
+      revisionScoreThreshold: 6
     }
   });
 }
