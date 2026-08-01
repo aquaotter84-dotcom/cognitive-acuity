@@ -1,11 +1,13 @@
 import { useState, useEffect, useRef } from 'react';
-import { Menu, Volume2, VolumeX } from 'lucide-react';
+import { Menu, Volume2, VolumeX, Phone, PhoneOff } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { useSpeechSynthesis } from '@/hooks/useVoice';
+import { useConversationMode } from '@/hooks/useConversationMode';
 import { useCognos } from '@/lib/cognosContext';
 import ChatMessage from '@/components/chat/ChatMessage';
 import ChatInput from '@/components/chat/ChatInput';
 import WelcomeScreen from '@/components/chat/WelcomeScreen';
+import ConversationOverlay from '@/components/chat/ConversationOverlay';
 
 export default function Chat() {
   const { activeWorkspace, currentUser, activeConversationId, setActiveConversationId, refreshConversations, openSidebar } = useCognos();
@@ -20,6 +22,9 @@ export default function Chat() {
   const autoSpeakRef = useRef(false);
   const messagesEndRef = useRef(null);
   const { speak, cancel } = useSpeechSynthesis();
+  const handleSendRef = useRef(null);
+  const conv = useConversationMode({ onUserTurn: (text) => handleSendRef.current?.(text) });
+  const convActiveRef = useRef(false);
 
   useEffect(() => {
     if (activeConversationId) {
@@ -40,6 +45,7 @@ export default function Chat() {
   }, [messages, isProcessing]);
 
   useEffect(() => { autoSpeakRef.current = autoSpeak; }, [autoSpeak]);
+  useEffect(() => { convActiveRef.current = conv.active; }, [conv.active]);
 
   const handleSend = async (text) => {
     if (!activeWorkspace || isProcessing) return;
@@ -114,6 +120,7 @@ export default function Chat() {
       refreshConversations();
 
       setStreaming({ id: assistantMsg.id, full: aiResponse, revealed: '', done: false });
+      return aiResponse;
     } catch (error) {
       const errDetail = error?.data?.error || error?.message || 'Unknown error';
       const errorMsg = await base44.entities.Message.create({
@@ -127,8 +134,11 @@ export default function Chat() {
       setMessages(prev => [...prev, errorMsg]);
       setStreaming(null);
       setIsProcessing(false);
+      return null;
     }
   };
+
+  useEffect(() => { handleSendRef.current = handleSend; });
 
   const handleStop = () => {
     abortRef.current = true;
@@ -146,7 +156,7 @@ export default function Chat() {
     if (streaming.revealed.length >= streaming.full.length) {
       const fullText = streaming.full;
       const t = setTimeout(() => {
-        if (autoSpeakRef.current) speak(fullText);
+        if (autoSpeakRef.current && !convActiveRef.current) speak(fullText);
         setStreaming(null);
         setIsProcessing(false);
       }, 80);
@@ -169,6 +179,15 @@ export default function Chat() {
           <h2 className="text-sm font-medium truncate">{activeWorkspace?.name || 'COGNOS'}</h2>
           {conversationSummary && <p className="text-xs text-muted-foreground truncate">{conversationSummary}</p>}
         </div>
+        {conv.supported && (
+          <button
+            onClick={() => conv.active ? conv.deactivate() : conv.activate()}
+            className={`p-1.5 rounded-lg transition-colors ${conv.active ? 'text-primary bg-primary/10' : 'text-muted-foreground hover:text-foreground'}`}
+            title={conv.active ? 'End conversation mode' : 'Conversation mode'}
+          >
+            {conv.active ? <PhoneOff className="w-4 h-4" /> : <Phone className="w-4 h-4" />}
+          </button>
+        )}
         <button
           onClick={() => { const v = !autoSpeak; setAutoSpeak(v); if (!v) cancel(); }}
           className={`p-1.5 rounded-lg transition-colors ${autoSpeak ? 'text-primary bg-primary/10' : 'text-muted-foreground hover:text-foreground'}`}
@@ -222,6 +241,14 @@ export default function Chat() {
       </div>
 
       <ChatInput onSend={handleSend} disabled={!activeWorkspace} isProcessing={isProcessing} onStop={handleStop} />
+      {conv.active && (
+        <ConversationOverlay
+          phase={conv.phase}
+          interim={conv.interim}
+          onInterrupt={conv.interrupt}
+          onEnd={conv.deactivate}
+        />
+      )}
     </div>
   );
 }
