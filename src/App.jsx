@@ -12,6 +12,7 @@ import Chat from '@/pages/Chat';
 import Memory from '@/pages/Memory';
 import Workspaces from '@/pages/Workspaces';
 import Settings from '@/pages/Settings';
+import Activity from '@/pages/Activity';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -45,6 +46,7 @@ const AuthenticatedApp = () => {
           <Route path="/memory" element={<Memory />} />
           <Route path="/workspaces" element={<Workspaces />} />
           <Route path="/settings" element={<Settings />} />
+          <Route path="/activity" element={<Activity />} />
         </Route>
       </Route>
       <Route path="*" element={<PageNotFound />} />

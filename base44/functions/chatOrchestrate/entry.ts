@@ -78,6 +78,40 @@ async function selectRelevantMemories(ctx, userMessage, pool, maxMemories) {
   return pool.slice(0, maxMemories);
 }
 
+const SUMMARIZE_SCHEMA = {
+  type: "object",
+  properties: { summary: { type: "string" } }
+};
+
+// Phase 9 — conversation summarization. After each exchange, a lightweight model
+// writes a 1-2 sentence running summary onto the Conversation so the workspace
+// retains context continuity. Best-effort; never fails the request.
+async function summarizeConversation(ctx, conversationId, history, userMessage, responseText) {
+  try {
+    const transcript = [
+      ...history.map(m => `${m.role}: ${m.content}`),
+      `user: ${userMessage}`,
+      `assistant: ${responseText}`
+    ].join('\n');
+    const result = await callLLM(ctx, {
+      model: ctx.config.models.memory,
+      responseJsonSchema: SUMMARIZE_SCHEMA,
+      messages: [
+        { role: "system", content: "Summarize the following conversation in 1-2 concise sentences. Capture what the user wanted and the outcome. Return only the summary text." },
+        { role: "user", content: transcript }
+      ]
+    });
+    const summary = result?.summary?.trim();
+    if (summary) {
+      await ctx.base44.entities.Conversation.update(conversationId, { summary });
+      return summary;
+    }
+  } catch (e) {
+    ctx.logger.warn("conversation summarization failed", { error: String(e) });
+  }
+  return null;
+}
+
 async function handle(req) {
   const base44 = createClientFromRequest(req);
   const user = await base44.auth.me();
@@ -305,6 +339,12 @@ async function handle(req) {
   });
   await orchestrator.dispatch("auditLog", auditMsg, ctx);
 
+  // --- Phase 9: conversation summarization (best-effort) ---
+  let conversationSummary = null;
+  if (ctx.config.orchestrator.summaryEnabled !== false) {
+    conversationSummary = await summarizeConversation(ctx, conversationId, contextResult.history, userMessage, currentResponse.responseText);
+  }
+
   await eventBus.publish("orchestration.complete", { latencyMs });
 
   return Response.json({
@@ -312,6 +352,7 @@ async function handle(req) {
     taskType: currentResponse.taskType,
     modelUsed: currentResponse.modelUsed,
     latencyMs,
+    summary: conversationSummary,
     council: {
       memoriesUsed: (contextResult.memories || []).map(m => ({ id: m.id, preview: String(m.content || '').slice(0, 120) })),
       classification: observerResult.classification,

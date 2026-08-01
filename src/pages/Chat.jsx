@@ -11,6 +11,7 @@ export default function Chat() {
   const [messages, setMessages] = useState([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [councilTraces, setCouncilTraces] = useState({});
+  const [conversationSummary, setConversationSummary] = useState(null);
   const messagesEndRef = useRef(null);
 
   useEffect(() => {
@@ -18,8 +19,12 @@ export default function Chat() {
       base44.entities.Message.filter({ conversation_id: activeConversationId }, 'created_date', 50)
         .then(msgs => setMessages(msgs))
         .catch(() => setMessages([]));
+      base44.entities.Conversation.get(activeConversationId)
+        .then(c => setConversationSummary(c?.summary || null))
+        .catch(() => setConversationSummary(null));
     } else {
       setMessages([]);
+      setConversationSummary(null);
     }
   }, [activeConversationId]);
 
@@ -68,7 +73,7 @@ export default function Chat() {
         userMessage: text
       });
 
-      const { response: aiResponse, taskType, modelUsed, latencyMs, council } = result.data;
+      const { response: aiResponse, taskType, modelUsed, latencyMs, council, summary } = result.data;
 
       const assistantMsg = await base44.entities.Message.create({
         conversation_id: convId,
@@ -83,6 +88,7 @@ export default function Chat() {
       if (council) {
         setCouncilTraces(prev => ({ ...prev, [assistantMsg.id]: { ...council, modelUsed, taskType, latencyMs } }));
       }
+      if (summary) setConversationSummary(summary);
 
       await base44.entities.Conversation.update(convId, {
         last_message_preview: aiResponse.slice(0, 100)
@@ -110,7 +116,10 @@ export default function Chat() {
         <button onClick={openSidebar} className="md:hidden p-2 -ml-2 rounded-lg hover:bg-muted transition-colors">
           <Menu className="w-5 h-5" />
         </button>
-        <h2 className="text-sm font-medium flex-1 truncate">{activeWorkspace?.name || 'COGNOS'}</h2>
+        <div className="flex-1 min-w-0">
+          <h2 className="text-sm font-medium truncate">{activeWorkspace?.name || 'COGNOS'}</h2>
+          {conversationSummary && <p className="text-xs text-muted-foreground truncate">{conversationSummary}</p>}
+        </div>
       </header>
 
       <div className="flex-1 overflow-y-auto scrollbar-thin">

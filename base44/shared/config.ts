@@ -7,7 +7,8 @@ export function getSystemConfig() {
     orchestrator: {
       maxHistoryMessages: 20,
       maxMemories: 10,
-      memoryPoolSize: 20
+      memoryPoolSize: 20,
+      summaryEnabled: true
     },
     models: {
       primary: "gpt_5_4",
