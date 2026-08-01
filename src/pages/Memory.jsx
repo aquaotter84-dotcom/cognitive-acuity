@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Brain, Search, Plus, Trash2, Edit2, Check, X } from 'lucide-react';
+import { Brain, Search, Plus, Trash2, Edit2, Check, X, Share2 } from 'lucide-react';
 import moment from 'moment';
 import { base44 } from '@/api/base44Client';
 import { useCognos } from '@/lib/cognosContext';
+import ShareMemoryModal from '@/components/memory/ShareMemoryModal';
 
 const typeColors = {
   episodic: 'bg-accent/15 text-accent',
@@ -24,7 +25,7 @@ const volatilityColors = {
 };
 
 export default function Memory() {
-  const { activeWorkspace } = useCognos();
+  const { activeWorkspace, currentUser } = useCognos();
   const [memories, setMemories] = useState([]);
   const [search, setSearch] = useState('');
   const [editingId, setEditingId] = useState(null);
@@ -33,6 +34,8 @@ export default function Memory() {
   const [editVolatility, setEditVolatility] = useState('medium');
   const [isAdding, setIsAdding] = useState(false);
   const [newContent, setNewContent] = useState('');
+  const [workspaces, setWorkspaces] = useState([]);
+  const [shareMem, setShareMem] = useState(null);
 
   const loadMemories = async () => {
     if (!activeWorkspace) return;
@@ -47,6 +50,8 @@ export default function Memory() {
   };
 
   useEffect(() => { loadMemories(); }, [activeWorkspace?.id]);
+
+  useEffect(() => { base44.entities.Workspace.list().then(setWorkspaces).catch(() => {}); }, []);
 
   const filtered = memories.filter(m =>
     m.content?.toLowerCase().includes(search.toLowerCase())
@@ -89,6 +94,19 @@ export default function Memory() {
     });
     setNewContent('');
     setIsAdding(false);
+    loadMemories();
+  };
+
+  const handleShare = async (mem, ws) => {
+    await base44.entities.Memory.update(mem.id, { workspace_id: ws.id, member_ids: ws.member_ids });
+    setShareMem(null);
+    loadMemories();
+  };
+
+  const handleRevoke = async (mem) => {
+    const personalWs = workspaces.find(w => w.is_default) || workspaces.find(w => (w.member_ids || []).length <= 1);
+    if (!personalWs || !currentUser) return;
+    await base44.entities.Memory.update(mem.id, { workspace_id: personalWs.id, member_ids: [currentUser.id] });
     loadMemories();
   };
 
@@ -188,6 +206,11 @@ export default function Memory() {
                       <button onClick={() => handleToggle(mem)} className={`w-9 h-5 rounded-full transition-colors ${mem.is_enabled ? 'bg-accent' : 'bg-muted'}`}>
                         <span className={`block w-4 h-4 rounded-full bg-white transition-transform ${mem.is_enabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
                       </button>
+                      {(mem.member_ids || []).length > 1 ? (
+                        <button onClick={() => handleRevoke(mem)} title="Revoke sharing" className="p-1.5 text-amber-400 hover:text-amber-300"><Share2 className="w-3.5 h-3.5" /></button>
+                      ) : (
+                        <button onClick={() => setShareMem(mem)} title="Share to workspace" className="p-1.5 text-muted-foreground hover:text-accent"><Share2 className="w-3.5 h-3.5" /></button>
+                      )}
                       <button onClick={() => { setEditingId(mem.id); setEditContent(mem.content); setEditEvidence(mem.evidence_level || 'direct'); setEditVolatility(mem.volatility || 'medium'); }} className="p-1.5 text-muted-foreground hover:text-foreground"><Edit2 className="w-3.5 h-3.5" /></button>
                       <button onClick={() => handleDelete(mem.id)} className="p-1.5 text-muted-foreground hover:text-destructive"><Trash2 className="w-3.5 h-3.5" /></button>
                     </div>
@@ -198,6 +221,10 @@ export default function Memory() {
           )}
         </div>
       </div>
+
+      {shareMem && (
+        <ShareMemoryModal memory={shareMem} workspaces={workspaces} currentUser={currentUser} onClose={() => setShareMem(null)} onShared={(ws) => handleShare(shareMem, ws)} />
+      )}
     </div>
   );
 }

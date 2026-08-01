@@ -1,16 +1,18 @@
 import { useState, useEffect } from 'react';
-import { Brain, Briefcase, FlaskConical, Palette, Rocket, BookOpen, Heart, Code, Plus, Edit2, Trash2, Check, X } from 'lucide-react';
+import { Brain, Briefcase, FlaskConical, Palette, Rocket, BookOpen, Heart, Code, Plus, Edit2, Trash2, Check, X, Users } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { useCognos } from '@/lib/cognosContext';
+import WorkspaceMembers from '@/components/workspaces/WorkspaceMembers';
 
 const ICON_MAP = { Brain, Briefcase, FlaskConical, Palette, Rocket, BookOpen, Heart, Code };
 const ICON_NAMES = Object.keys(ICON_MAP);
 const COLORS = ['#3B82F6', '#7C3AED', '#10B981', '#F59E0B', '#F43F5E', '#06B6D4'];
 
 export default function Workspaces() {
-  const { activeWorkspace, setActiveWorkspace, setActiveConversationId } = useCognos();
+  const { activeWorkspace, setActiveWorkspace, setActiveConversationId, currentUser } = useCognos();
   const [workspaces, setWorkspaces] = useState([]);
   const [isModalOpen, setModalOpen] = useState(false);
+  const [membersWs, setMembersWs] = useState(null);
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState({ name: '', description: '', instructions: '', color: '#3B82F6', icon: 'Brain' });
 
@@ -22,6 +24,14 @@ export default function Workspaces() {
   };
 
   useEffect(() => { load(); }, []);
+
+  const handleMembersUpdated = async () => {
+    try {
+      const wss = await base44.entities.Workspace.list();
+      setWorkspaces(wss);
+      setMembersWs(prev => (prev ? wss.find(w => w.id === prev.id) || prev : prev));
+    } catch (e) { console.error(e); }
+  };
 
   const openNew = () => {
     setEditingId(null);
@@ -41,7 +51,7 @@ export default function Workspaces() {
       if (editingId) {
         await base44.entities.Workspace.update(editingId, form);
       } else {
-        await base44.entities.Workspace.create(form);
+        await base44.entities.Workspace.create({ ...form, member_ids: [currentUser.id], member_emails: [currentUser.email] });
       }
       setModalOpen(false);
       load();
@@ -84,6 +94,9 @@ export default function Workspaces() {
                     <Icon className="w-5 h-5" />
                   </div>
                   <div className="flex items-center gap-1">
+                    <button onClick={() => setMembersWs(ws)} className="flex items-center gap-1 px-2 py-1 rounded-md text-xs bg-muted/50 hover:bg-muted text-foreground/80" title="Members">
+                      <Users className="w-3.5 h-3.5" /> {(ws.member_ids || []).length}
+                    </button>
                     <button onClick={() => openEdit(ws)} className="p-1.5 text-muted-foreground hover:text-foreground"><Edit2 className="w-4 h-4" /></button>
                     <button onClick={() => handleDelete(ws)} disabled={isActive} className="p-1.5 text-muted-foreground hover:text-destructive disabled:opacity-30 disabled:cursor-not-allowed"><Trash2 className="w-4 h-4" /></button>
                   </div>
@@ -148,6 +161,10 @@ export default function Workspaces() {
             </div>
           </div>
         </div>
+      )}
+
+      {membersWs && (
+        <WorkspaceMembers workspace={membersWs} currentUser={currentUser} onClose={() => setMembersWs(null)} onUpdated={handleMembersUpdated} />
       )}
     </div>
   );
