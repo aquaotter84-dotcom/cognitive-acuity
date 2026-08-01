@@ -32,6 +32,7 @@ export default function Memory() {
   const [editContent, setEditContent] = useState('');
   const [editEvidence, setEditEvidence] = useState('direct');
   const [editVolatility, setEditVolatility] = useState('medium');
+  const [editImportance, setEditImportance] = useState(5);
   const [isAdding, setIsAdding] = useState(false);
   const [newContent, setNewContent] = useState('');
   const [workspaces, setWorkspaces] = useState([]);
@@ -60,13 +61,23 @@ export default function Memory() {
   );
 
   const handleToggle = async (mem) => {
-    await base44.entities.Memory.update(mem.id, { is_enabled: !mem.is_enabled });
-    loadMemories();
+    try {
+      await base44.entities.Memory.update(mem.id, { is_enabled: !mem.is_enabled });
+      loadMemories();
+    } catch (e) {
+      console.error('Failed to toggle memory:', e);
+      setEditError(e?.message || 'Failed to update. Please try again.');
+    }
   };
 
   const handleDelete = async (id) => {
-    await base44.entities.Memory.delete(id);
-    loadMemories();
+    try {
+      await base44.entities.Memory.delete(id);
+      loadMemories();
+    } catch (e) {
+      console.error('Failed to delete memory:', e);
+      setEditError(e?.message || 'Failed to delete. Please try again.');
+    }
   };
 
   const handleSaveEdit = async (id) => {
@@ -78,6 +89,7 @@ export default function Memory() {
         content: editContent.trim(),
         evidence_level: editEvidence,
         volatility: editVolatility,
+        importance: Number(editImportance),
         last_confirmed: new Date().toISOString()
       });
       setEditingId(null);
@@ -195,6 +207,9 @@ export default function Memory() {
                         <option value="medium">medium</option>
                         <option value="high">high</option>
                       </select>
+                      <select value={editImportance} onChange={(e) => setEditImportance(e.target.value)} className="bg-background border border-border rounded-lg px-2 py-1 text-xs focus:outline-none focus:border-accent/50" title="Importance 1-10">
+                        {[1,2,3,4,5,6,7,8,9,10].map(n => <option key={n} value={n}>imp {n}</option>)}
+                      </select>
                       <div className="flex justify-end gap-2 ml-auto">
                         <button onClick={() => { setEditingId(null); setEditError(null); }} className="p-1.5 text-muted-foreground hover:text-foreground"><X className="w-4 h-4" /></button>
                         <button onClick={() => handleSaveEdit(mem.id)} disabled={savingId === mem.id} className="p-1.5 text-accent hover:text-accent/80 disabled:opacity-40"><Check className="w-4 h-4" /></button>
@@ -225,7 +240,7 @@ export default function Memory() {
                       ) : (
                         <button onClick={() => setShareMem(mem)} title="Share to workspace" className="p-1.5 text-muted-foreground hover:text-accent"><Share2 className="w-3.5 h-3.5" /></button>
                       )}
-                      <button onClick={() => { setEditingId(mem.id); setEditContent(mem.content); setEditEvidence(mem.evidence_level || 'direct'); setEditVolatility(mem.volatility || 'medium'); }} className="p-1.5 text-muted-foreground hover:text-foreground"><Edit2 className="w-3.5 h-3.5" /></button>
+                      <button onClick={() => { setEditingId(mem.id); setEditContent(mem.content); setEditEvidence(mem.evidence_level || 'direct'); setEditVolatility(mem.volatility || 'medium'); setEditImportance(mem.importance || 5); setEditError(null); }} className="p-1.5 text-muted-foreground hover:text-foreground"><Edit2 className="w-3.5 h-3.5" /></button>
                       <button onClick={() => handleDelete(mem.id)} className="p-1.5 text-muted-foreground hover:text-destructive"><Trash2 className="w-3.5 h-3.5" /></button>
                     </div>
                   </div>
