@@ -120,7 +120,7 @@ async function handle(req) {
   if (!user) throw new CognosError("Unauthorized", { code: "AUTH", category: "auth", status: 401 });
 
   const body = await req.json();
-  const { conversationId, workspaceId, userMessage } = body;
+  const { conversationId, workspaceId, userMessage, style } = body;
   if (!conversationId || !workspaceId || !userMessage) {
     throw new CognosError("Missing required fields", { code: "VALIDATION", category: "input", status: 400 });
   }
@@ -241,7 +241,7 @@ async function handle(req) {
   const contextMsg = createMessage({
     type: "context.request",
     from: "orchestrator",
-    content: { conversationId, workspaceId, userMessage }
+    content: { conversationId, workspaceId, userMessage, style }
   });
   const contextResult = await orchestrator.dispatch("contextAssembly", contextMsg, ctx);
 

@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
-import { Send, Paperclip } from 'lucide-react';
+import { Send, Paperclip, Square } from 'lucide-react';
 
-export default function ChatInput({ onSend, disabled }) {
+export default function ChatInput({ onSend, disabled, isProcessing, onStop }) {
   const [text, setText] = useState('');
   const textareaRef = useRef(null);
 
@@ -42,13 +42,23 @@ export default function ChatInput({ onSend, disabled }) {
           rows={1}
           className="flex-1 bg-transparent resize-none outline-none text-sm py-2 placeholder:text-muted-foreground/60 scrollbar-thin"
         />
-        <button
-          onClick={handleSend}
-          disabled={disabled || !text.trim()}
-          className="p-2 rounded-xl bg-primary text-primary-foreground disabled:opacity-30 disabled:cursor-not-allowed hover:bg-primary/90 transition-colors"
-        >
-          <Send className="w-4 h-4" />
-        </button>
+        {isProcessing ? (
+          <button
+            onClick={onStop}
+            className="p-2 rounded-xl bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors"
+            title="Stop"
+          >
+            <Square className="w-4 h-4" />
+          </button>
+        ) : (
+          <button
+            onClick={handleSend}
+            disabled={disabled || !text.trim()}
+            className="p-2 rounded-xl bg-primary text-primary-foreground disabled:opacity-30 disabled:cursor-not-allowed hover:bg-primary/90 transition-colors"
+          >
+            <Send className="w-4 h-4" />
+          </button>
+        )}
       </div>
     </div>
   );

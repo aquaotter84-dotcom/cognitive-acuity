@@ -4,7 +4,7 @@
 // takes the direct path: a single contextual LLM response (the former llmRespond).
 
 import { defineAgent } from "../runtime.ts";
-import { callLLM, buildContextSystemPrompt } from "../llm.ts";
+import { callLLM, buildContextSystemPrompt, styleDirective } from "../llm.ts";
 
 const SPECIALIST_PROMPTS = {
   research: "You are a Research specialist in the COGNOS council. Investigate the assigned question thoroughly, surface concrete facts, and return well-organized findings in markdown. Focus only on your assigned sub-task.",
@@ -28,7 +28,7 @@ export const specialistAgent = defineAgent({
     const subTasks = taskContext?.sub_tasks;
     if (Array.isArray(subTasks) && subTasks.length > 0) {
       const outputs = await Promise.all(subTasks.map(async (st) => {
-        const rolePrompt = SPECIALIST_PROMPTS[st.agent] || SPECIALIST_PROMPTS[classification?.task_type] || SPECIALIST_PROMPTS.conversation;
+        const rolePrompt = (SPECIALIST_PROMPTS[st.agent] || SPECIALIST_PROMPTS[classification?.task_type] || SPECIALIST_PROMPTS.conversation) + styleDirective(message.content.style);
         try {
           const output = await callLLM(ctx, {
             model: ctx.config.models.primary,
@@ -52,7 +52,7 @@ export const specialistAgent = defineAgent({
     }
 
     // --- Direct path: single contextual response ---
-    const systemPrompt = buildContextSystemPrompt(workspace, memories, classification);
+    const systemPrompt = buildContextSystemPrompt(workspace, memories, classification, undefined, message.content.style);
     const chatMessages = [
       { role: "system", content: systemPrompt },
       ...history.map(msg => ({ role: msg.role, content: msg.content })),

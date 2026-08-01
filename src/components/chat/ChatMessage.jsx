@@ -3,9 +3,10 @@ import { Copy, Check } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import CouncilTrace from '@/components/chat/CouncilTrace';
 
-export default function ChatMessage({ message, council }) {
+export default function ChatMessage({ message, council, streamingText, isStreaming }) {
   const [copied, setCopied] = useState(false);
   const isUser = message.role === 'user';
+  const displayContent = streamingText != null ? streamingText : message.content;
 
   const handleCopy = () => {
     navigator.clipboard.writeText(message.content);
@@ -42,14 +43,17 @@ export default function ChatMessage({ message, council }) {
               a: ({ children, href }) => <a href={href} target="_blank" rel="noopener noreferrer" className="text-primary underline">{children}</a>,
             }}
           >
-            {message.content}
+            {displayContent}
           </ReactMarkdown>
+          {isStreaming && <span className="inline-block w-1.5 h-4 bg-primary/70 align-middle ml-0.5 animate-pulse rounded-sm" />}
         </div>
-        {council && <CouncilTrace council={council} />}
-        <button onClick={handleCopy} className="mt-1 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
-          {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-          {copied ? 'Copied' : 'Copy'}
-        </button>
+        {council && !isStreaming && <CouncilTrace council={council} />}
+        {!isStreaming && (
+          <button onClick={handleCopy} className="mt-1 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
+            {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+            {copied ? 'Copied' : 'Copy'}
+          </button>
+        )}
       </div>
     </div>
   );

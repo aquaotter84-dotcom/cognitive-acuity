@@ -12,6 +12,9 @@ export default function Chat() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [councilTraces, setCouncilTraces] = useState({});
   const [conversationSummary, setConversationSummary] = useState(null);
+  const [style, setStyle] = useState('balanced');
+  const [streaming, setStreaming] = useState(null);
+  const abortRef = useRef(false);
   const messagesEndRef = useRef(null);
 
   useEffect(() => {
@@ -68,13 +71,17 @@ export default function Chat() {
     }
 
     setIsProcessing(true);
+    abortRef.current = false;
 
     try {
       const result = await base44.functions.invoke('chatOrchestrate', {
         conversationId: convId,
         workspaceId: activeWorkspace.id,
-        userMessage: text
+        userMessage: text,
+        style
       });
+
+      if (abortRef.current) return;
 
       const { response: aiResponse, taskType, modelUsed, latencyMs, council, summary } = result.data;
 
@@ -99,6 +106,8 @@ export default function Chat() {
       });
 
       refreshConversations();
+
+      setStreaming({ id: assistantMsg.id, full: aiResponse, revealed: '', done: false });
     } catch (error) {
       const errDetail = error?.data?.error || error?.message || 'Unknown error';
       const errorMsg = await base44.entities.Message.create({
@@ -110,10 +119,37 @@ export default function Chat() {
         member_ids: memberIds
       });
       setMessages(prev => [...prev, errorMsg]);
-    } finally {
+      setStreaming(null);
       setIsProcessing(false);
     }
   };
+
+  const handleStop = () => {
+    abortRef.current = true;
+    if (streaming && !streaming.done) {
+      const partial = streaming.revealed;
+      setMessages(prev => prev.map(m => (m.id === streaming.id ? { ...m, content: partial } : m)));
+      base44.entities.Message.update(streaming.id, { content: partial }).catch(() => {});
+    }
+    setStreaming(null);
+    setIsProcessing(false);
+  };
+
+  useEffect(() => {
+    if (!streaming) return;
+    if (streaming.revealed.length >= streaming.full.length) {
+      const t = setTimeout(() => {
+        setStreaming(null);
+        setIsProcessing(false);
+      }, 80);
+      return () => clearTimeout(t);
+    }
+    const chunk = Math.max(2, Math.ceil(streaming.full.length / 72));
+    const t = setTimeout(() => {
+      setStreaming(s => (s ? { ...s, revealed: s.full.slice(0, s.revealed.length + chunk) } : s));
+    }, 16);
+    return () => clearTimeout(t);
+  }, [streaming]);
 
   return (
     <div className="flex flex-col h-full">
@@ -125,6 +161,18 @@ export default function Chat() {
           <h2 className="text-sm font-medium truncate">{activeWorkspace?.name || 'COGNOS'}</h2>
           {conversationSummary && <p className="text-xs text-muted-foreground truncate">{conversationSummary}</p>}
         </div>
+        <select
+          value={style}
+          onChange={(e) => setStyle(e.target.value)}
+          disabled={isProcessing}
+          className="text-xs bg-muted border border-border rounded-lg px-2 py-1.5 text-muted-foreground hover:text-foreground focus:outline-none focus:border-primary/50 disabled:opacity-50 cursor-pointer"
+          title="Communication style"
+        >
+          <option value="balanced">Balanced</option>
+          <option value="casual">Casual</option>
+          <option value="technical">Technical</option>
+          <option value="strategic">Strategic</option>
+        </select>
       </header>
 
       <div className="flex-1 overflow-y-auto scrollbar-thin">
@@ -133,9 +181,15 @@ export default function Chat() {
         ) : (
           <div className="max-w-3xl mx-auto px-4 py-6 space-y-6">
             {messages.map(msg => (
-              <ChatMessage key={msg.id} message={msg} council={councilTraces[msg.id]} />
+              <ChatMessage
+                key={msg.id}
+                message={msg}
+                council={councilTraces[msg.id]}
+                streamingText={streaming && streaming.id === msg.id ? streaming.revealed : null}
+                isStreaming={streaming && streaming.id === msg.id && !streaming.done}
+              />
             ))}
-            {isProcessing && (
+            {isProcessing && !streaming && (
               <div className="flex gap-3 animate-fade-in">
                 <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center flex-shrink-0">
                   <span className="text-xs font-bold text-white">C</span>
@@ -152,7 +206,7 @@ export default function Chat() {
         )}
       </div>
 
-      <ChatInput onSend={handleSend} disabled={isProcessing || !activeWorkspace} />
+      <ChatInput onSend={handleSend} disabled={!activeWorkspace} isProcessing={isProcessing} onStop={handleStop} />
     </div>
   );
 }
