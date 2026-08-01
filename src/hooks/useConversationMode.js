@@ -142,7 +142,22 @@ export function useConversationMode({ onUserTurn }) {
         const t = r[0].transcript;
         if (r.isFinal) finalText += t; else interimText += t;
       }
-      if (interimText) setInterim(interimText);
+      if (interimText) {
+        setInterim(interimText);
+        // Interim barge-in: the moment the user starts speaking over the
+        // assistant's reply, cut the audio stream immediately — don't wait
+        // for a finalized phrase (which lags 1-3s). The echo guard keeps us
+        // from cutting on our own TTS bleeding back into the mic; after the
+        // cut we drop to listening so the finalizing phrase triggers a new
+        // turn through the normal path below.
+        if (phaseRef.current === 'speaking') {
+          const it = interimText.trim();
+          if (it.length >= 4 && !isEcho(it, replyRef.current)) {
+            stopSpeaking();
+            setP('listening');
+          }
+        }
+      }
       if (finalText) {
         setInterim('');
         const text = finalText.trim();
