@@ -36,6 +36,8 @@ export default function Memory() {
   const [newContent, setNewContent] = useState('');
   const [workspaces, setWorkspaces] = useState([]);
   const [shareMem, setShareMem] = useState(null);
+  const [editError, setEditError] = useState(null);
+  const [savingId, setSavingId] = useState(null);
 
   const loadMemories = async () => {
     if (!activeWorkspace) return;
@@ -69,14 +71,23 @@ export default function Memory() {
 
   const handleSaveEdit = async (id) => {
     if (!editContent.trim()) return;
-    await base44.entities.Memory.update(id, {
-      content: editContent.trim(),
-      evidence_level: editEvidence,
-      volatility: editVolatility,
-      last_confirmed: new Date().toISOString()
-    });
-    setEditingId(null);
-    loadMemories();
+    setSavingId(id);
+    setEditError(null);
+    try {
+      await base44.entities.Memory.update(id, {
+        content: editContent.trim(),
+        evidence_level: editEvidence,
+        volatility: editVolatility,
+        last_confirmed: new Date().toISOString()
+      });
+      setEditingId(null);
+      loadMemories();
+    } catch (e) {
+      console.error('Failed to save memory:', e);
+      setEditError(e?.message || 'Failed to save. Please try again.');
+    } finally {
+      setSavingId(null);
+    }
   };
 
   const handleCreate = async () => {
@@ -185,10 +196,13 @@ export default function Memory() {
                         <option value="high">high</option>
                       </select>
                       <div className="flex justify-end gap-2 ml-auto">
-                        <button onClick={() => setEditingId(null)} className="p-1.5 text-muted-foreground hover:text-foreground"><X className="w-4 h-4" /></button>
-                        <button onClick={() => handleSaveEdit(mem.id)} className="p-1.5 text-accent hover:text-accent/80"><Check className="w-4 h-4" /></button>
+                        <button onClick={() => { setEditingId(null); setEditError(null); }} className="p-1.5 text-muted-foreground hover:text-foreground"><X className="w-4 h-4" /></button>
+                        <button onClick={() => handleSaveEdit(mem.id)} disabled={savingId === mem.id} className="p-1.5 text-accent hover:text-accent/80 disabled:opacity-40"><Check className="w-4 h-4" /></button>
                       </div>
                     </div>
+                    {editError && editingId === mem.id && (
+                      <p className="text-xs text-destructive mt-2">{editError}</p>
+                    )}
                   </div>
                 ) : (
                   <div className="flex items-start justify-between gap-3">
