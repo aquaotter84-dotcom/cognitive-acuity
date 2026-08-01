@@ -14,6 +14,14 @@ export function getSystemConfig() {
     limits: {
       responseMaxTokens: 2000,
       memoryMaxTokens: 500
+    },
+    council: {
+      observerModel: "openai/gpt-4o-mini",
+      observerMaxTokens: 300,
+      criticModel: "openai/gpt-4o-mini",
+      criticMaxTokens: 400,
+      criticEnabled: true,
+      governorEnabled: true
     }
   });
 }

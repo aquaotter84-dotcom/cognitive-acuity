@@ -10,6 +10,7 @@ import { createOrchestrator } from "../../shared/orchestrator.ts";
 import { defineAgent } from "../../shared/runtime.ts";
 import { createMessage } from "../../shared/protocol.ts";
 import { CognosError, wrapHandler } from "../../shared/errors.ts";
+import { registerCouncil } from "../../shared/council/index.ts";
 
 const OPENAI_URL = 'https://openrouter.ai/api/v1/chat/completions';
 const rootLogger = createLogger("chatOrchestrate");
@@ -65,13 +66,16 @@ async function handle(req) {
     name: "llmRespond",
     type: "stage",
     async handle(message, ctx) {
-      const { history, memories, workspace, userMessage } = message.content;
+      const { history, memories, workspace, userMessage, classification } = message.content;
       let systemPrompt = 'You are COGNOS, an intelligent AI reasoning assistant. You provide thoughtful, accurate, and helpful responses. Use markdown formatting when appropriate for clarity.';
       if (workspace.instructions) {
         systemPrompt += `\n\nWORKSPACE INSTRUCTIONS:\n${workspace.instructions}`;
       }
       if (memories && memories.length > 0) {
         systemPrompt += `\n\nRELEVANT MEMORIES:\n${memories.map(m => `- ${m.content}`).join('\n')}`;
+      }
+      if (classification?.task_type && classification.task_type !== 'conversation') {
+        systemPrompt += `\n\nTASK CONTEXT: The Observer classified this as "${classification.task_type}" (${classification.complexity || 'unknown'} complexity). Tailor your reasoning approach accordingly.`;
       }
       const chatMessages = [
         { role: 'system', content: systemPrompt },
@@ -99,7 +103,7 @@ async function handle(req) {
       const llmData = await llmResponse.json();
       return {
         responseText: llmData.choices[0].message.content,
-        taskType: 'conversation',
+        taskType: classification?.task_type || 'conversation',
         modelUsed: ctx.config.models.primary
       };
     }
@@ -189,6 +193,7 @@ async function handle(req) {
   registry.register(llmAgent.name, llmAgent);
   registry.register(memoryAgent.name, memoryAgent);
   registry.register(auditAgent.name, auditAgent);
+  registerCouncil(registry);
 
   const ctx = { base44, apiKey, config, logger };
 
@@ -202,14 +207,44 @@ async function handle(req) {
   });
   const contextResult = await orchestrator.dispatch("contextAssembly", contextMsg, ctx);
 
+  // --- Phase 2: cognitive layer — perception & planning ---
+  const observerMsg = createMessage({
+    type: "council.observe",
+    from: "orchestrator",
+    content: contextResult
+  });
+  const observerResult = await orchestrator.dispatch("observer", observerMsg, ctx);
+
+  const strategistMsg = createMessage({
+    type: "council.plan",
+    from: "orchestrator",
+    content: observerResult
+  });
+  const strategistResult = await orchestrator.dispatch("strategist", strategistMsg, ctx);
+
   const llmMsg = createMessage({
     type: "llm.request",
     from: "orchestrator",
-    content: contextResult
+    content: strategistResult
   });
   const llmResult = await orchestrator.dispatch("llmRespond", llmMsg, ctx);
 
   const latencyMs = Date.now() - startTime;
+
+  // --- Phase 2: cognitive layer — critique & governance ---
+  const criticMsg = createMessage({
+    type: "council.critique",
+    from: "orchestrator",
+    content: { ...strategistResult, responseText: llmResult.responseText }
+  });
+  const criticResult = await orchestrator.dispatch("critic", criticMsg, ctx);
+
+  const governorMsg = createMessage({
+    type: "council.govern",
+    from: "orchestrator",
+    content: { responseText: llmResult.responseText }
+  });
+  const governorResult = await orchestrator.dispatch("governor", governorMsg, ctx);
 
   // --- Post-response stages (best-effort, awaited to preserve prior ordering) ---
   const memMsg = createMessage({
@@ -240,7 +275,14 @@ async function handle(req) {
     response: llmResult.responseText,
     taskType: llmResult.taskType,
     modelUsed: llmResult.modelUsed,
-    latencyMs
+    latencyMs,
+    council: {
+      classification: observerResult.classification,
+      plan: strategistResult.plan,
+      taskContextId: strategistResult.taskContext?.id || null,
+      critic: criticResult.evaluation,
+      governor: { approved: governorResult.approved, flags: governorResult.flags }
+    }
   });
 }
 
