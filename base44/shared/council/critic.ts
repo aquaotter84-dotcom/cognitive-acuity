@@ -4,13 +4,24 @@
 
 import { defineAgent } from "../runtime.ts";
 import { callLLM } from "../llm.ts";
+import { withCharter } from "./charter.ts";
 
 const CRITIC_SCHEMA = {
   type: "object",
   properties: {
     score: { type: "integer" },
     reasoning: { type: "string" },
-    needs_revision: { type: "boolean" }
+    needs_revision: { type: "boolean" },
+    charter: {
+      type: "object",
+      properties: {
+        truth: { type: "boolean" },
+        evidence: { type: "boolean" },
+        agency: { type: "boolean" },
+        dignity: { type: "boolean" },
+        note: { type: "string" }
+      }
+    }
   }
 };
 
@@ -29,7 +40,7 @@ export const criticAgent = defineAgent({
         messages: [
           {
             role: "system",
-            content: "You are the Critic, the evaluation agent of the COGNOS council. Assess the assistant response to the user request. Set score to an integer 1-10, reasoning to a short explanation, and needs_revision to true only for clearly inadequate or incorrect responses."
+            content: withCharter("You are the Critic, the evaluation agent of the COGNOS council. Assess the assistant response to the user request. Set score to an integer 1-10, reasoning to a short explanation, and needs_revision to true only for clearly inadequate, incorrect, or charter-violating responses. Evaluate the response against the COGNOS charter: set charter.truth, charter.evidence, charter.agency, and charter.dignity to true when upheld or false when violated, and charter.note to a brief explanation.")
           },
           { role: "user", content: `Request: ${userMessage}\n\nResponse: ${responseText}` }
         ]

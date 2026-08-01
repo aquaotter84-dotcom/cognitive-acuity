@@ -6,6 +6,8 @@
 // flattened. When responseJsonSchema is provided, InvokeLLM returns a parsed object;
 // otherwise it returns a string.
 
+import { withCharter } from "./council/charter.ts";
+
 export async function callLLM(ctx, { messages, responseJsonSchema = null, model = null }) {
   const prompt = messages
     .map(m => (m.role === "system" ? m.content : `${m.role === "assistant" ? "Assistant" : "User"}: ${m.content}`))
@@ -18,7 +20,7 @@ export async function callLLM(ctx, { messages, responseJsonSchema = null, model 
 }
 
 export function buildContextSystemPrompt(workspace, memories, classification, base = 'You are COGNOS, an intelligent AI reasoning assistant. You provide thoughtful, accurate, and helpful responses. Use markdown formatting when appropriate for clarity.') {
-  let systemPrompt = base;
+  let systemPrompt = withCharter(base);
   if (workspace?.instructions) {
     systemPrompt += `\n\nWORKSPACE INSTRUCTIONS:\n${workspace.instructions}`;
   }

@@ -57,6 +57,21 @@ export default function CouncilTrace({ council }) {
 
       {open && (
         <div className="px-3 pb-3 space-y-3 border-t border-border/60 pt-3">
+          {critic?.charter && (
+            <Section title="Charter">
+              <div className="flex flex-wrap gap-1.5">
+                {['truth', 'evidence', 'agency', 'dignity'].map(p => {
+                  const ok = critic.charter[p];
+                  return (
+                    <span key={p} className={`px-1.5 py-0.5 rounded text-[10px] font-medium uppercase ${ok ? 'text-green-400 bg-green-400/10' : 'text-red-400 bg-red-400/10'}`}>
+                      {p}
+                    </span>
+                  );
+                })}
+              </div>
+              {critic.charter.note && <p className="text-muted-foreground">{critic.charter.note}</p>}
+            </Section>
+          )}
           {Array.isArray(memoriesUsed) && memoriesUsed.length > 0 && (
             <Section title={`Memory (${memoriesUsed.length})`}>
               {memoriesUsed.map(m => (
