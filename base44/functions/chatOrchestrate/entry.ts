@@ -61,53 +61,7 @@ async function handle(req) {
     }
   });
 
-  // --- Stage: LLM response ---
-  const llmAgent = defineAgent({
-    name: "llmRespond",
-    type: "stage",
-    async handle(message, ctx) {
-      const { history, memories, workspace, userMessage, classification } = message.content;
-      let systemPrompt = 'You are COGNOS, an intelligent AI reasoning assistant. You provide thoughtful, accurate, and helpful responses. Use markdown formatting when appropriate for clarity.';
-      if (workspace.instructions) {
-        systemPrompt += `\n\nWORKSPACE INSTRUCTIONS:\n${workspace.instructions}`;
-      }
-      if (memories && memories.length > 0) {
-        systemPrompt += `\n\nRELEVANT MEMORIES:\n${memories.map(m => `- ${m.content}`).join('\n')}`;
-      }
-      if (classification?.task_type && classification.task_type !== 'conversation') {
-        systemPrompt += `\n\nTASK CONTEXT: The Observer classified this as "${classification.task_type}" (${classification.complexity || 'unknown'} complexity). Tailor your reasoning approach accordingly.`;
-      }
-      const chatMessages = [
-        { role: 'system', content: systemPrompt },
-        ...history.map(msg => ({ role: msg.role, content: msg.content })),
-        { role: 'user', content: userMessage }
-      ];
-      const llmResponse = await fetch(OPENAI_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${ctx.apiKey}`,
-          'HTTP-Referer': 'https://cognos.app',
-          'X-Title': 'COGNOS'
-        },
-        body: JSON.stringify({
-          model: ctx.config.models.primary,
-          messages: chatMessages,
-          max_tokens: ctx.config.limits.responseMaxTokens
-        })
-      });
-      if (!llmResponse.ok) {
-        const errText = await llmResponse.text();
-        throw new CognosError(`Model API error (${llmResponse.status}): ${errText}`, { code: "LLM_ERROR", category: "model", status: 502 });
-      }
-      const llmData = await llmResponse.json();
-      return {
-        responseText: llmData.choices[0].message.content,
-        taskType: classification?.task_type || 'conversation',
-        modelUsed: ctx.config.models.primary
-      };
-    }
-  });
+  // --- Stage: LLM response — moved to the council specialist + synthesizer (Phase 3) ---
 
   // --- Stage: memory extraction (best-effort) ---
   const memoryAgent = defineAgent({
@@ -190,7 +144,6 @@ async function handle(req) {
   });
 
   registry.register(contextAgent.name, contextAgent);
-  registry.register(llmAgent.name, llmAgent);
   registry.register(memoryAgent.name, memoryAgent);
   registry.register(auditAgent.name, auditAgent);
   registerCouncil(registry);
@@ -222,12 +175,21 @@ async function handle(req) {
   });
   const strategistResult = await orchestrator.dispatch("strategist", strategistMsg, ctx);
 
-  const llmMsg = createMessage({
-    type: "llm.request",
+  // --- Phase 3: specialist layer — execute sub-tasks or direct response ---
+  const specialistMsg = createMessage({
+    type: "council.execute",
     from: "orchestrator",
     content: strategistResult
   });
-  const llmResult = await orchestrator.dispatch("llmRespond", llmMsg, ctx);
+  const specialistResult = await orchestrator.dispatch("specialist", specialistMsg, ctx);
+
+  // --- Phase 3: synthesis — combine specialist outputs (no-op for direct path) ---
+  const synthMsg = createMessage({
+    type: "council.synthesize",
+    from: "orchestrator",
+    content: specialistResult
+  });
+  const synthResult = await orchestrator.dispatch("synthesizer", synthMsg, ctx);
 
   const latencyMs = Date.now() - startTime;
 
@@ -235,14 +197,14 @@ async function handle(req) {
   const criticMsg = createMessage({
     type: "council.critique",
     from: "orchestrator",
-    content: { ...strategistResult, responseText: llmResult.responseText }
+    content: synthResult
   });
   const criticResult = await orchestrator.dispatch("critic", criticMsg, ctx);
 
   const governorMsg = createMessage({
     type: "council.govern",
     from: "orchestrator",
-    content: { responseText: llmResult.responseText }
+    content: { responseText: synthResult.responseText }
   });
   const governorResult = await orchestrator.dispatch("governor", governorMsg, ctx);
 
@@ -250,7 +212,7 @@ async function handle(req) {
   const memMsg = createMessage({
     type: "memory.request",
     from: "orchestrator",
-    content: { workspaceId, conversationId, userMessage, responseText: llmResult.responseText }
+    content: { workspaceId, conversationId, userMessage, responseText: synthResult.responseText }
   });
   await orchestrator.dispatch("memoryExtraction", memMsg, ctx);
 
@@ -261,8 +223,8 @@ async function handle(req) {
       userId: user.id,
       workspaceId,
       conversationId,
-      modelUsed: llmResult.modelUsed,
-      taskType: llmResult.taskType,
+      modelUsed: synthResult.modelUsed,
+      taskType: synthResult.taskType,
       latencyMs,
       status: "success"
     }
@@ -272,14 +234,15 @@ async function handle(req) {
   await eventBus.publish("orchestration.complete", { latencyMs });
 
   return Response.json({
-    response: llmResult.responseText,
-    taskType: llmResult.taskType,
-    modelUsed: llmResult.modelUsed,
+    response: synthResult.responseText,
+    taskType: synthResult.taskType,
+    modelUsed: synthResult.modelUsed,
     latencyMs,
     council: {
       classification: observerResult.classification,
       plan: strategistResult.plan,
       taskContextId: strategistResult.taskContext?.id || null,
+      subTasks: specialistResult.subTaskOutputs || null,
       critic: criticResult.evaluation,
       governor: { approved: governorResult.approved, flags: governorResult.flags }
     }

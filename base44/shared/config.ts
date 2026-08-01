@@ -18,6 +18,8 @@ export function getSystemConfig() {
     council: {
       observerModel: "openai/gpt-4o-mini",
       observerMaxTokens: 300,
+      strategistModel: "openai/gpt-4o-mini",
+      strategistMaxTokens: 400,
       criticModel: "openai/gpt-4o-mini",
       criticMaxTokens: 400,
       criticEnabled: true,
