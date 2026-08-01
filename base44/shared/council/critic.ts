@@ -3,8 +3,16 @@
 // failure. Marks the TaskContext complete when present.
 
 import { defineAgent } from "../runtime.ts";
+import { callLLM } from "../llm.ts";
 
-const OPENAI_URL = "https://openrouter.ai/api/v1/chat/completions";
+const CRITIC_SCHEMA = {
+  type: "object",
+  properties: {
+    score: { type: "integer" },
+    reasoning: { type: "string" },
+    needs_revision: { type: "boolean" }
+  }
+};
 
 export const criticAgent = defineAgent({
   name: "critic",
@@ -15,33 +23,20 @@ export const criticAgent = defineAgent({
     }
     const { userMessage, responseText, taskContext } = message.content;
     try {
-      const resp = await fetch(OPENAI_URL, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${ctx.apiKey}`,
-          "HTTP-Referer": "https://cognos.app",
-          "X-Title": "COGNOS"
-        },
-        body: JSON.stringify({
-          model: ctx.config.council.criticModel,
-          messages: [
-            {
-              role: "system",
-              content: 'You are the Critic, the evaluation agent of the COGNOS council. Assess the assistant response to the user request. Respond with JSON only: {"score": integer 1-10, "reasoning": string, "needs_revision": boolean}. needs_revision=true only for clearly inadequate or incorrect responses.'
-            },
-            { role: "user", content: `Request: ${userMessage}\n\nResponse: ${responseText}` }
-          ],
-          max_tokens: ctx.config.council.criticMaxTokens,
-          response_format: { type: "json_object" }
-        })
+      const evaluation = await callLLM(ctx, {
+        model: ctx.config.council.criticModel,
+        responseJsonSchema: CRITIC_SCHEMA,
+        messages: [
+          {
+            role: "system",
+            content: "You are the Critic, the evaluation agent of the COGNOS council. Assess the assistant response to the user request. Set score to an integer 1-10, reasoning to a short explanation, and needs_revision to true only for clearly inadequate or incorrect responses."
+          },
+          { role: "user", content: `Request: ${userMessage}\n\nResponse: ${responseText}` }
+        ]
       });
-      if (!resp.ok) {
-        ctx.logger.warn("critic model call failed", { status: resp.status });
-        return { evaluation: { skipped: true, reason: "model_error" } };
+      if (!evaluation || typeof evaluation !== "object") {
+        return { evaluation: { skipped: true, reason: "malformed" } };
       }
-      const data = await resp.json();
-      const evaluation = JSON.parse(data.choices[0].message.content);
       if (taskContext?.id) {
         try {
           await ctx.base44.entities.TaskContext.update(taskContext.id, { status: "complete" });

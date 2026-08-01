@@ -3,10 +3,19 @@
 // returns a safe default classification so the core chat never breaks.
 
 import { defineAgent } from "../runtime.ts";
-
-const OPENAI_URL = "https://openrouter.ai/api/v1/chat/completions";
+import { callLLM } from "../llm.ts";
 
 const TASK_TYPES = "conversation, question_answering, research, planning, coding, analysis, creative, decision_support, action_execution";
+
+const OBSERVER_SCHEMA = {
+  type: "object",
+  properties: {
+    task_type: { type: "string" },
+    complexity: { type: "string" },
+    needs_decomposition: { type: "boolean" },
+    intent: { type: "string" }
+  }
+};
 
 export const observerAgent = defineAgent({
   name: "observer",
@@ -15,33 +24,20 @@ export const observerAgent = defineAgent({
     const { userMessage } = message.content;
     const fallback = { task_type: "conversation", complexity: "simple", needs_decomposition: false, intent: "unclassified" };
     try {
-      const resp = await fetch(OPENAI_URL, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${ctx.apiKey}`,
-          "HTTP-Referer": "https://cognos.app",
-          "X-Title": "COGNOS"
-        },
-        body: JSON.stringify({
-          model: ctx.config.council.observerModel,
-          messages: [
-            {
-              role: "system",
-              content: `You are the Observer, the perception agent of the COGNOS council. Classify the user's request. Respond with JSON only: {"task_type": one of [${TASK_TYPES}], "complexity": "simple"|"moderate"|"complex", "needs_decomposition": boolean, "intent": string}. Set needs_decomposition=true only for genuinely multi-step or multi-domain tasks.`
-            },
-            { role: "user", content: userMessage }
-          ],
-          max_tokens: ctx.config.council.observerMaxTokens,
-          response_format: { type: "json_object" }
-        })
+      const classification = await callLLM(ctx, {
+        model: ctx.config.council.observerModel,
+        responseJsonSchema: OBSERVER_SCHEMA,
+        messages: [
+          {
+            role: "system",
+            content: `You are the Observer, the perception agent of the COGNOS council. Classify the user's request. Set task_type to one of [${TASK_TYPES}], complexity to "simple", "moderate", or "complex", needs_decomposition to true only for genuinely multi-step or multi-domain tasks, and intent to a short description.`
+          },
+          { role: "user", content: userMessage }
+        ]
       });
-      if (!resp.ok) {
-        ctx.logger.warn("observer model call failed", { status: resp.status });
+      if (!classification || typeof classification !== "object" || !classification.task_type) {
         return { ...message.content, classification: fallback };
       }
-      const data = await resp.json();
-      const classification = JSON.parse(data.choices[0].message.content);
       return { ...message.content, classification };
     } catch (e) {
       ctx.logger.warn("observer failed, using fallback classification", { error: String(e) });

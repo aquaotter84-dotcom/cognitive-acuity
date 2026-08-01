@@ -29,7 +29,6 @@ export const synthesizerAgent = defineAgent({
     ];
     const responseText = await callLLM(ctx, {
       model: ctx.config.models.primary,
-      maxTokens: ctx.config.limits.responseMaxTokens,
       messages: chatMessages
     });
     return {

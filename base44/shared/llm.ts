@@ -1,30 +1,20 @@
-// Shared LLM utilities — central OpenRouter call + context system-prompt builder.
-// Used by the council specialist and synthesizer so the model-call contract lives
-// in one place rather than being copied between stages.
+// Shared LLM utilities — routes model calls through Base44's built-in InvokeLLM
+// integration (platform-managed key), so the app needs no external API key or credits.
+// Used by the council operators and the memory stage.
+//
+// InvokeLLM takes a single prompt string (not a message array), so chat messages are
+// flattened. When responseJsonSchema is provided, InvokeLLM returns a parsed object;
+// otherwise it returns a string.
 
-import { CognosError } from "./errors.ts";
-
-const OPENAI_URL = "https://openrouter.ai/api/v1/chat/completions";
-
-export async function callLLM(ctx, { model, messages, maxTokens, jsonMode = false }) {
-  const body = { model, messages, max_tokens: maxTokens };
-  if (jsonMode) body.response_format = { type: "json_object" };
-  const resp = await fetch(OPENAI_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${ctx.apiKey}`,
-      "HTTP-Referer": "https://cognos.app",
-      "X-Title": "COGNOS"
-    },
-    body: JSON.stringify(body)
-  });
-  if (!resp.ok) {
-    const errText = await resp.text();
-    throw new CognosError(`Model API error (${resp.status}): ${errText}`, { code: "LLM_ERROR", category: "model", status: 502 });
-  }
-  const data = await resp.json();
-  return data.choices[0].message.content;
+export async function callLLM(ctx, { messages, responseJsonSchema = null, model = null }) {
+  const prompt = messages
+    .map(m => (m.role === "system" ? m.content : `${m.role === "assistant" ? "Assistant" : "User"}: ${m.content}`))
+    .join("\n\n");
+  const args = { prompt };
+  if (model) args.model = model;
+  if (responseJsonSchema) args.response_json_schema = responseJsonSchema;
+  const res = await ctx.base44.asServiceRole.integrations.Core.InvokeLLM(args);
+  return res;
 }
 
 export function buildContextSystemPrompt(workspace, memories, classification, base = 'You are COGNOS, an intelligent AI reasoning assistant. You provide thoughtful, accurate, and helpful responses. Use markdown formatting when appropriate for clarity.') {

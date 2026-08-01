@@ -32,7 +32,6 @@ export const specialistAgent = defineAgent({
         try {
           const output = await callLLM(ctx, {
             model: ctx.config.models.primary,
-            maxTokens: ctx.config.limits.responseMaxTokens,
             messages: [
               { role: "system", content: rolePrompt },
               { role: "user", content: st.input || st.description || userMessage }
@@ -61,7 +60,6 @@ export const specialistAgent = defineAgent({
     ];
     const responseText = await callLLM(ctx, {
       model: ctx.config.models.primary,
-      maxTokens: ctx.config.limits.responseMaxTokens,
       messages: chatMessages
     });
     return {

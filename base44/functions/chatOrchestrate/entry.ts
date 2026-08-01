@@ -1,5 +1,4 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.40';
-import { secrets } from "base44:runtime";
 
 // Phase 1 nervous system
 import { createLogger } from "../../shared/logging.ts";
@@ -11,9 +10,26 @@ import { defineAgent } from "../../shared/runtime.ts";
 import { createMessage } from "../../shared/protocol.ts";
 import { CognosError, wrapHandler } from "../../shared/errors.ts";
 import { registerCouncil } from "../../shared/council/index.ts";
+import { callLLM } from "../../shared/llm.ts";
 
-const OPENAI_URL = 'https://openrouter.ai/api/v1/chat/completions';
 const rootLogger = createLogger("chatOrchestrate");
+
+const MEMORY_SCHEMA = {
+  type: "object",
+  properties: {
+    memories: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          content: { type: "string" },
+          memory_type: { type: "string" },
+          importance: { type: "integer" }
+        }
+      }
+    }
+  }
+};
 
 async function handle(req) {
   const base44 = createClientFromRequest(req);
@@ -25,9 +41,6 @@ async function handle(req) {
   if (!conversationId || !workspaceId || !userMessage) {
     throw new CognosError("Missing required fields", { code: "VALIDATION", category: "input", status: 400 });
   }
-
-  const apiKey = secrets.get("Api_key");
-  if (!apiKey) throw new CognosError("API key not configured", { code: "CONFIG", category: "secrets", status: 500 });
 
   // --- Nervous system setup ---
   const config = getSystemConfig();
@@ -70,40 +83,23 @@ async function handle(req) {
     async handle(message, ctx) {
       const { workspaceId, conversationId, userMessage, responseText } = message.content;
       try {
-        const memResponse = await fetch(OPENAI_URL, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${ctx.apiKey}`
-          },
-          body: JSON.stringify({
-            model: ctx.config.models.memory,
-            messages: [
-              {
-                role: 'system',
-                content: 'You are a memory extraction agent. Analyze the conversation and extract any important facts, preferences, or information worth remembering for future conversations. Only extract genuinely useful, long-term information — not casual conversation. Return a JSON object with a "memories" array. Each memory has "content" (string), "memory_type" ("episodic" or "semantic"), and "importance" (1-10 integer). Return {"memories": []} if nothing is worth remembering.'
-              },
-              {
-                role: 'user',
-                content: `User: ${userMessage}\nAssistant: ${responseText}`
-              }
-            ],
-            max_tokens: ctx.config.limits.memoryMaxTokens,
-            response_format: { type: 'json_object' }
-          })
+        const memResult = await callLLM(ctx, {
+          model: ctx.config.models.memory,
+          responseJsonSchema: MEMORY_SCHEMA,
+          messages: [
+            {
+              role: "system",
+              content: 'You are a memory extraction agent. Analyze the conversation and extract any important facts, preferences, or information worth remembering for future conversations. Only extract genuinely useful, long-term information — not casual conversation. Return a memories array; each memory has content (string), memory_type ("episodic" or "semantic"), and importance (1-10 integer). Return an empty array if nothing is worth remembering.'
+            },
+            { role: "user", content: `User: ${userMessage}\nAssistant: ${responseText}` }
+          ]
         });
-        if (!memResponse.ok) {
-          ctx.logger.warn("memory extraction model call failed", { status: memResponse.status });
-          return;
-        }
-        const memData = await memResponse.json();
-        const memResult = JSON.parse(memData.choices[0].message.content);
-        if (memResult?.memories && memResult.memories.length > 0) {
+        if (memResult?.memories && Array.isArray(memResult.memories) && memResult.memories.length > 0) {
           const records = memResult.memories
-            .filter(m => m.content && m.content.trim().length > 5)
+            .filter(m => m.content && String(m.content).trim().length > 5)
             .map(m => ({
               workspace_id: workspaceId,
-              content: m.content.trim(),
+              content: String(m.content).trim(),
               memory_type: m.memory_type || 'episodic',
               source: conversationId,
               importance: m.importance || 5,
@@ -148,7 +144,7 @@ async function handle(req) {
   registry.register(auditAgent.name, auditAgent);
   registerCouncil(registry);
 
-  const ctx = { base44, apiKey, config, logger };
+  const ctx = { base44, config, logger };
 
   const startTime = Date.now();
 

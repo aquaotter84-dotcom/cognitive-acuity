@@ -1,12 +1,30 @@
 // Council operator — Strategist (planning). When the Observer flags a task as needing
 // decomposition, asks a lightweight model to break the goal into 2-4 specialist
 // sub-tasks and persists them on a new TaskContext. Rule-based pass-through otherwise.
-// Phase 3: now populates TaskContext.sub_tasks for the specialist layer to execute.
+// Phase 3: populates TaskContext.sub_tasks for the specialist layer to execute.
 
 import { defineAgent } from "../runtime.ts";
 import { callLLM } from "../llm.ts";
 
 const ALLOWED_AGENTS = ["research", "coding", "analysis", "planning", "creative", "decision_support", "question_answering", "action_execution"];
+
+const DECOMP_SCHEMA = {
+  type: "object",
+  properties: {
+    sub_tasks: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          id: { type: "string" },
+          agent: { type: "string" },
+          description: { type: "string" },
+          input: { type: "string" }
+        }
+      }
+    }
+  }
+};
 
 export const strategistAgent = defineAgent({
   name: "strategist",
@@ -17,24 +35,20 @@ export const strategistAgent = defineAgent({
       return { ...message.content, taskContext: null, plan: "direct" };
     }
     try {
-      const raw = await callLLM(ctx, {
+      const result = await callLLM(ctx, {
         model: ctx.config.council.strategistModel,
-        maxTokens: ctx.config.council.strategistMaxTokens,
-        jsonMode: true,
+        responseJsonSchema: DECOMP_SCHEMA,
         messages: [
           {
             role: "system",
-            content: `You are the Strategist of the COGNOS council. Decompose the user's goal into 2-4 focused sub-tasks, each assigned to a specialist. Respond with JSON only: {"sub_tasks":[{"id":"s1","agent":one of [${ALLOWED_AGENTS.join(", ")}],"description":"short","input":"the specific instruction for the specialist"}]}. Keep sub-tasks independent and non-overlapping.`
+            content: `You are the Strategist of the COGNOS council. Decompose the user's goal into 2-4 focused sub-tasks, each assigned to a specialist agent. Set each sub_task's agent to one of [${ALLOWED_AGENTS.join(", ")}]. Keep sub-tasks independent and non-overlapping.`
           },
           { role: "user", content: userMessage }
         ]
       });
       let sub_tasks = [];
-      try {
-        const parsed = JSON.parse(raw);
-        sub_tasks = (parsed.sub_tasks || []).filter(s => s.agent && ALLOWED_AGENTS.includes(s.agent));
-      } catch (e) {
-        ctx.logger.warn("strategist could not parse decomposition", { error: String(e) });
+      if (result && Array.isArray(result.sub_tasks)) {
+        sub_tasks = result.sub_tasks.filter(s => s.agent && ALLOWED_AGENTS.includes(s.agent));
       }
       if (sub_tasks.length === 0) {
         return { ...message.content, taskContext: null, plan: "direct" };

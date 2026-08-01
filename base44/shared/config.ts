@@ -1,5 +1,6 @@
-// Configuration system — central system configuration. Phase 1 ships static defaults;
-// later phases can extend this to read from workspace/entity-backed settings.
+// Configuration system — central system configuration.
+// LLM calls route through Base44's built-in InvokeLLM integration (platform-managed
+// key), so no external API key or credits are required. Model names are InvokeLLM IDs.
 
 export function getSystemConfig() {
   return Object.freeze({
@@ -8,20 +9,13 @@ export function getSystemConfig() {
       maxMemories: 10
     },
     models: {
-      primary: "openai/gpt-4o",
-      memory: "openai/gpt-4o-mini"
-    },
-    limits: {
-      responseMaxTokens: 2000,
-      memoryMaxTokens: 500
+      primary: "gpt_5_4",
+      memory: "gpt_5_mini"
     },
     council: {
-      observerModel: "openai/gpt-4o-mini",
-      observerMaxTokens: 300,
-      strategistModel: "openai/gpt-4o-mini",
-      strategistMaxTokens: 400,
-      criticModel: "openai/gpt-4o-mini",
-      criticMaxTokens: 400,
+      observerModel: "gpt_5_mini",
+      strategistModel: "gpt_5_mini",
+      criticModel: "gpt_5_mini",
       criticEnabled: true,
       governorEnabled: true
     }
