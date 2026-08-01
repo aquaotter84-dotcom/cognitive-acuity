@@ -9,8 +9,9 @@ import { specialistAgent } from "./specialist.ts";
 import { synthesizerAgent } from "./synthesizer.ts";
 import { criticAgent } from "./critic.ts";
 import { governorAgent } from "./governor.ts";
+import { webSearchAgent } from "./webSearch.ts";
 
-export { observerAgent, strategistAgent, specialistAgent, synthesizerAgent, criticAgent, governorAgent };
+export { observerAgent, strategistAgent, specialistAgent, synthesizerAgent, criticAgent, governorAgent, webSearchAgent };
 
 export function registerCouncil(registry) {
   registry.register(observerAgent.name, observerAgent);
@@ -19,4 +20,5 @@ export function registerCouncil(registry) {
   registry.register(synthesizerAgent.name, synthesizerAgent);
   registry.register(criticAgent.name, criticAgent);
   registry.register(governorAgent.name, governorAgent);
+  registry.register(webSearchAgent.name, webSearchAgent);
 }

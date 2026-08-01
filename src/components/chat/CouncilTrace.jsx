@@ -28,14 +28,15 @@ function Field({ label, value }) {
 export default function CouncilTrace({ council }) {
   const [open, setOpen] = useState(false);
   if (!council) return null;
-  const { classification, plan, subTasks, critic, revisions, governor, modelUsed, latencyMs, memoriesUsed } = council || {};
-  if (!classification && !plan && !critic) return null;
+  const { classification, plan, subTasks, critic, revisions, governor, modelUsed, latencyMs, memoriesUsed, webSearch } = council || {};
+  if (!classification && !plan && !critic && !webSearch) return null;
 
   const score = critic?.score;
   const summary = [
     classification?.task_type,
     classification?.complexity,
-    plan === 'decomposed' ? 'decomposed' : 'direct'
+    plan === 'decomposed' ? 'decomposed' : 'direct',
+    webSearch ? 'web search' : null
   ].filter(Boolean).join(' • ');
 
   return (
@@ -97,6 +98,14 @@ export default function CouncilTrace({ council }) {
               {classification.needs_decomposition && (
                 <span className="inline-block px-1.5 py-0.5 rounded bg-accent/15 text-accent">needs decomposition</span>
               )}
+            </Section>
+          )}
+
+          {webSearch && (
+            <Section title="Web Search">
+              <Field label="Query" value={webSearch.query} />
+              <p className="text-foreground/70 whitespace-pre-wrap line-clamp-8 leading-relaxed">{webSearch.results}</p>
+              {webSearch.model && <span className="text-muted-foreground/60 text-[10px]">via {webSearch.model}</span>}
             </Section>
           )}
 

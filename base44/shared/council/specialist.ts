@@ -52,21 +52,24 @@ export const specialistAgent = defineAgent({
     }
 
     // --- Direct path: single contextual response ---
-    // Real-time web search requires a Gemini model with add_context_from_internet.
-    // Attachments (image/file file_urls) are forwarded for multimodal analysis.
-    const { attachments, webSearch } = message.content;
-    const directModel = webSearch ? 'gemini_3_flash' : ctx.config.models.primary;
+    // Web search grounding arrives explicitly via searchResults (pulled by the
+    // webSearch council tool), surfaced in the trace and fed here as context so
+    // the council reasons over pulled facts. Attachments (file_urls) forwarded for
+    // multimodal analysis.
+    const { attachments, searchResults } = message.content;
     const systemPrompt = buildContextSystemPrompt(workspace, memories, classification, undefined, message.content.style);
+    const userContent = searchResults
+      ? `${userMessage}\n\n[Web search results — current information pulled by the council web search tool; cite as needed]:\n${searchResults}`
+      : userMessage;
     const chatMessages = [
       { role: "system", content: systemPrompt },
       ...history.map(msg => ({ role: msg.role, content: msg.content })),
-      { role: "user", content: userMessage }
+      { role: "user", content: userContent }
     ];
     const responseText = await callLLM(ctx, {
-      model: directModel,
+      model: ctx.config.models.primary,
       messages: chatMessages,
-      ...(attachments && attachments.length ? { file_urls: attachments.map(a => a.file_url).filter(Boolean) } : {}),
-      ...(webSearch ? { add_context_from_internet: true } : {})
+      ...(attachments && attachments.length ? { file_urls: attachments.map(a => a.file_url).filter(Boolean) } : {})
     });
     return {
       ...message.content,
@@ -74,7 +77,7 @@ export const specialistAgent = defineAgent({
       needsSynthesis: false,
       subTaskOutputs: null,
       taskType: classification?.task_type || "conversation",
-      modelUsed: directModel
+      modelUsed: ctx.config.models.primary
     };
   }
 });

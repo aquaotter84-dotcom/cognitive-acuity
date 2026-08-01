@@ -253,10 +253,18 @@ async function handle(req) {
   });
   const observerResult = await orchestrator.dispatch("observer", observerMsg, ctx);
 
+  // --- Web search tool — pulls current facts when the Observer flags it (or the user toggle is on) ---
+  const webSearchMsg = createMessage({
+    type: "council.search",
+    from: "orchestrator",
+    content: observerResult
+  });
+  const webSearchResult = await orchestrator.dispatch("webSearch", webSearchMsg, ctx);
+
   const strategistMsg = createMessage({
     type: "council.plan",
     from: "orchestrator",
-    content: observerResult
+    content: webSearchResult
   });
   const strategistResult = await orchestrator.dispatch("strategist", strategistMsg, ctx);
 
@@ -362,6 +370,7 @@ async function handle(req) {
     council: {
       memoriesUsed: (contextResult.memories || []).map(m => ({ id: m.id, preview: String(m.content || '').slice(0, 120), evidence: m.evidence_level || null, volatility: m.volatility || null })),
       classification: observerResult.classification,
+      webSearch: webSearchResult.searchResults ? { query: webSearchResult.searchQuery, results: webSearchResult.searchResults, model: webSearchResult.webSearchModel } : null,
       plan: strategistResult.plan,
       taskContextId: strategistResult.taskContext?.id || null,
       subTasks: specialistResult.subTaskOutputs || null,
