@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Activity as ActivityIcon, Clock, Zap, AlertTriangle, Cpu } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
+import MobilePageHeader from '@/components/MobilePageHeader';
 
 const STATUS_COLORS = {
   success: 'text-emerald-400',
@@ -68,10 +69,11 @@ export default function Activity() {
 
   return (
     <div className="flex flex-col h-full overflow-y-auto scrollbar-thin">
+      <MobilePageHeader title="Activity" />
       <div className="max-w-3xl mx-auto w-full px-4 py-8 pb-24 md:pb-8">
         <div className="flex items-center gap-2 mb-2">
           <ActivityIcon className="w-6 h-6 text-primary" />
-          <h1 className="text-2xl font-bold">Activity</h1>
+          <h1 className="text-2xl font-bold select-none">Activity</h1>
         </div>
         <p className="text-sm text-muted-foreground mb-6">
           Observability for the COGNOS council — model usage, latency, and errors across your recent runs.

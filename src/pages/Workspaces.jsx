@@ -3,6 +3,7 @@ import { Brain, Briefcase, FlaskConical, Palette, Rocket, BookOpen, Heart, Code,
 import { base44 } from '@/api/base44Client';
 import { useCognos } from '@/lib/cognosContext';
 import WorkspaceMembers from '@/components/workspaces/WorkspaceMembers';
+import MobilePageHeader from '@/components/MobilePageHeader';
 
 const ICON_MAP = { Brain, Briefcase, FlaskConical, Palette, Rocket, BookOpen, Heart, Code };
 const ICON_NAMES = Object.keys(ICON_MAP);
@@ -72,6 +73,7 @@ export default function Workspaces() {
 
   return (
     <div className="flex flex-col h-full overflow-y-auto scrollbar-thin">
+      <MobilePageHeader title="Workspaces" />
       <div className="max-w-3xl mx-auto w-full px-4 py-8 pb-24 md:pb-8">
         <div className="flex items-center justify-between mb-6">
           <div>
@@ -88,7 +90,7 @@ export default function Workspaces() {
             const Icon = ICON_MAP[ws.icon] || Brain;
             const isActive = ws.id === activeWorkspace?.id;
             return (
-              <div key={ws.id} className={`p-5 rounded-2xl border bg-card transition-all ${isActive ? 'border-primary/50 ring-1 ring-primary/20' : 'border-border hover:border-border/80'}`}>
+              <div key={ws.id} className={`p-5 rounded-2xl border bg-card transition-all select-none ${isActive ? 'border-primary/50 ring-1 ring-primary/20' : 'border-border hover:border-border/80'}`}>
                 <div className="flex items-start justify-between mb-3">
                   <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: ws.color + '20', color: ws.color }}>
                     <Icon className="w-5 h-5" />

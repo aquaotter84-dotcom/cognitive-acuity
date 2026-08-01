@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
-import { Menu, Send, Plus, Sparkles, Loader2, Paperclip } from 'lucide-react';
+import { Menu, Send, Plus, Sparkles, Loader2, Paperclip, ArrowLeft } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { useCognos } from '@/lib/cognosContext';
 import AgentMessageBubble from '@/components/agent/AgentMessageBubble';
@@ -8,6 +9,7 @@ const AGENT = 'cognos';
 
 export default function AgentChat() {
   const { openSidebar } = useCognos();
+  const navigate = useNavigate();
   const [activeId, setActiveId] = useState(null);
   const [active, setActive] = useState(null);
   const [input, setInput] = useState('');
@@ -102,7 +104,10 @@ export default function AgentChat() {
 
   return (
     <div className="flex flex-col h-full">
-      <header className="flex items-center gap-3 px-4 py-3 border-b border-border">
+      <header className="flex items-center gap-3 px-4 py-3 border-b border-border select-none">
+        <button onClick={() => navigate('/')} className="md:hidden p-2 -ml-2 rounded-lg hover:bg-muted transition-colors" aria-label="Back to chat">
+          <ArrowLeft className="w-5 h-5" />
+        </button>
         <button onClick={openSidebar} className="md:hidden p-2 -ml-2 rounded-lg hover:bg-muted transition-colors">
           <Menu className="w-5 h-5" />
         </button>

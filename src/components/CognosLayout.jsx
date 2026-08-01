@@ -83,13 +83,13 @@ export default function CognosLayout() {
         {isSidebarOpen && (
           <div className="fixed inset-0 z-50 md:hidden">
             <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setSidebarOpen(false)} />
-            <div className="absolute left-0 top-0 bottom-0 w-[280px] bg-card border-r border-border animate-fade-in">
+            <div className="absolute left-0 top-0 bottom-0 w-[280px] bg-card border-r border-border animate-fade-in" style={{ paddingTop: 'env(safe-area-inset-top, 12px)' }}>
               <Sidebar onNavigate={() => setSidebarOpen(false)} />
             </div>
           </div>
         )}
 
-        <main className="flex-1 flex flex-col overflow-hidden pb-16 md:pb-0">
+        <main className="flex-1 flex flex-col overflow-hidden pb-16 md:pb-0" style={{ paddingTop: 'env(safe-area-inset-top, 12px)' }}>
           <Outlet />
         </main>
       </div>

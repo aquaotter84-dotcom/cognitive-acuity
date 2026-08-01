@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Menu, Volume2, VolumeX, Phone, PhoneOff, Globe } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { useSpeechSynthesis } from '@/hooks/useVoice';
@@ -8,9 +9,12 @@ import ChatMessage from '@/components/chat/ChatMessage';
 import ChatInput from '@/components/chat/ChatInput';
 import WelcomeScreen from '@/components/chat/WelcomeScreen';
 import ConversationOverlay from '@/components/chat/ConversationOverlay';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 
 export default function Chat() {
-  const { activeWorkspace, currentUser, activeConversationId, setActiveConversationId, refreshConversations, openSidebar } = useCognos();
+  const { activeWorkspace, currentUser, setActiveConversationId, refreshConversations, openSidebar } = useCognos();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const conversationId = searchParams.get('c');
   const [messages, setMessages] = useState([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [councilTraces, setCouncilTraces] = useState({});
@@ -27,19 +31,21 @@ export default function Chat() {
   const conv = useConversationMode({ onUserTurn: (text) => handleSendRef.current?.(text) });
   const convActiveRef = useRef(false);
 
+  useEffect(() => { setActiveConversationId(conversationId); }, [conversationId]);
+
   useEffect(() => {
-    if (activeConversationId) {
-      base44.entities.Message.filter({ conversation_id: activeConversationId }, 'created_date', 50)
+    if (conversationId) {
+      base44.entities.Message.filter({ conversation_id: conversationId }, 'created_date', 50)
         .then(msgs => setMessages(msgs))
         .catch(() => setMessages([]));
-      base44.entities.Conversation.get(activeConversationId)
+      base44.entities.Conversation.get(conversationId)
         .then(c => setConversationSummary(c?.summary || null))
         .catch(() => setConversationSummary(null));
     } else {
       setMessages([]);
       setConversationSummary(null);
     }
-  }, [activeConversationId]);
+  }, [conversationId]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -51,7 +57,7 @@ export default function Chat() {
   const handleSend = async (text, attachments = []) => {
     if (!activeWorkspace || isProcessing) return;
 
-    let convId = activeConversationId;
+    let convId = conversationId;
     let isNew = false;
     const memberIds = activeWorkspace.member_ids?.length ? activeWorkspace.member_ids : [currentUser.id];
 
@@ -64,6 +70,7 @@ export default function Chat() {
       });
       convId = conv.id;
       setActiveConversationId(convId);
+      setSearchParams({ c: convId });
       isNew = true;
     }
 
@@ -211,18 +218,17 @@ export default function Chat() {
         >
           {autoSpeak ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
         </button>
-        <select
-          value={style}
-          onChange={(e) => setStyle(e.target.value)}
-          disabled={isProcessing}
-          className="text-xs bg-muted border border-border rounded-lg px-2 py-1.5 text-muted-foreground hover:text-foreground focus:outline-none focus:border-primary/50 disabled:opacity-50 cursor-pointer"
-          title="Communication style"
-        >
-          <option value="balanced">Balanced</option>
-          <option value="casual">Casual</option>
-          <option value="technical">Technical</option>
-          <option value="strategic">Strategic</option>
-        </select>
+        <Select value={style} onValueChange={setStyle} disabled={isProcessing}>
+          <SelectTrigger className="text-xs h-8 w-[110px] bg-muted border border-border rounded-lg px-2 py-1.5 text-muted-foreground hover:text-foreground focus:outline-none focus:border-primary/50 disabled:opacity-50 cursor-pointer" title="Communication style">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="balanced">Balanced</SelectItem>
+            <SelectItem value="casual">Casual</SelectItem>
+            <SelectItem value="technical">Technical</SelectItem>
+            <SelectItem value="strategic">Strategic</SelectItem>
+          </SelectContent>
+        </Select>
       </header>
 
       <div className="flex-1 overflow-y-auto scrollbar-thin">

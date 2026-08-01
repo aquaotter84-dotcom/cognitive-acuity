@@ -1,15 +1,17 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Brain, Plus, Search, FolderKanban, Settings as SettingsIcon, Activity as ActivityIcon, Sparkles, Bot } from 'lucide-react';
 import { useCognos } from '@/lib/cognosContext';
 import { base44 } from '@/api/base44Client';
 import { Image } from '@/components/ui/image';
 import ConversationItem from '@/components/chat/ConversationItem';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 
 const COGNOS_LOGO = 'https://media.base44.com/images/public/6a65b5729b2fe6a520a0ab97/33193cff0_33519d65130b52f40ef3a4c45c04ff98d2430b231b5b15abfd0b3170de405f121.jpg';
 
 export default function Sidebar({ onNavigate }) {
   const { activeWorkspace, setActiveWorkspace, conversations, refreshConversations, activeConversationId, setActiveConversationId, currentUser } = useCognos();
+  const navigate = useNavigate();
   const [search, setSearch] = useState('');
   const [workspaces, setWorkspaces] = useState([]);
 
@@ -22,11 +24,13 @@ export default function Sidebar({ onNavigate }) {
   );
 
   const handleNewChat = () => {
+    navigate('/');
     setActiveConversationId(null);
     onNavigate?.();
   };
 
   const handleSelect = (id) => {
+    navigate(`/?c=${id}`);
     setActiveConversationId(id);
     onNavigate?.();
   };
@@ -58,6 +62,7 @@ export default function Sidebar({ onNavigate }) {
       );
     }
     await refreshConversations();
+    navigate(`/?c=${branched.id}`);
     setActiveConversationId(branched.id);
     onNavigate?.();
   };
@@ -92,18 +97,22 @@ export default function Sidebar({ onNavigate }) {
       </div>
 
       <div className="px-3 pb-3">
-        <select
+        <Select
           value={activeWorkspace?.id || ''}
-          onChange={(e) => {
-            const ws = workspaces.find(w => w.id === e.target.value);
+          onValueChange={(v) => {
+            const ws = workspaces.find(w => w.id === v);
             if (ws) setActiveWorkspace(ws);
           }}
-          className="w-full bg-muted/60 border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-primary/50"
         >
-          {workspaces.map(ws => (
-            <option key={ws.id} value={ws.id}>{ws.name}</option>
-          ))}
-        </select>
+          <SelectTrigger className="w-full h-9 bg-muted/60 border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-primary/50">
+            <SelectValue placeholder="Workspace" />
+          </SelectTrigger>
+          <SelectContent>
+            {workspaces.map(ws => (
+              <SelectItem key={ws.id} value={ws.id}>{ws.name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       <div className="px-3 pb-2">

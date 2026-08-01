@@ -4,6 +4,7 @@ import moment from 'moment';
 import { base44 } from '@/api/base44Client';
 import { useCognos } from '@/lib/cognosContext';
 import ShareMemoryModal from '@/components/memory/ShareMemoryModal';
+import MobilePageHeader from '@/components/MobilePageHeader';
 
 const typeColors = {
   episodic: 'bg-accent/15 text-accent',
@@ -135,10 +136,11 @@ export default function Memory() {
 
   return (
     <div className="flex flex-col h-full overflow-y-auto scrollbar-thin">
+      <MobilePageHeader title="Memory" />
       <div className="max-w-3xl mx-auto w-full px-4 py-8 pb-24 md:pb-8">
         <div className="flex items-center gap-2 mb-2">
           <Brain className="w-6 h-6 text-accent" />
-          <h1 className="text-2xl font-bold">Memory</h1>
+          <h1 className="text-2xl font-bold select-none">Memory</h1>
         </div>
         <p className="text-sm text-muted-foreground mb-6">
           Memories extracted from your conversations in <span className="text-foreground font-medium">{activeWorkspace?.name}</span>.

@@ -11,7 +11,7 @@ const navItems = [
 export default function MobileNav() {
   const location = useLocation();
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-40 md:hidden border-t border-border bg-card/95 backdrop-blur">
+    <nav className="fixed bottom-0 left-0 right-0 z-40 md:hidden border-t border-border bg-card/95 backdrop-blur select-none" style={{ paddingBottom: 'env(safe-area-inset-bottom, 12px)' }}>
       <div className="flex items-center justify-around py-2">
         {navItems.map(({ to, label, icon: Icon }) => {
           const isActive = location.pathname === to;

@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
-import { User, Brain, LogOut } from 'lucide-react';
+import { User, Brain, LogOut, Trash2 } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { useCognos } from '@/lib/cognosContext';
+import MobilePageHeader from '@/components/MobilePageHeader';
+import { AlertDialog, AlertDialogTrigger, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from '@/components/ui/alert-dialog';
 
 export default function Settings() {
   const { activeWorkspace } = useCognos();
@@ -38,8 +40,9 @@ export default function Settings() {
 
   return (
     <div className="flex flex-col h-full overflow-y-auto scrollbar-thin">
+      <MobilePageHeader title="Settings" />
       <div className="max-w-2xl mx-auto w-full px-4 py-8 pb-24 md:pb-8 space-y-6">
-        <h1 className="text-2xl font-bold">Settings</h1>
+        <h1 className="text-2xl font-bold select-none md:block hidden">Settings</h1>
 
         <section className="bg-card border border-border rounded-2xl p-6">
           <div className="flex items-center gap-2 mb-4">
@@ -93,10 +96,31 @@ export default function Settings() {
           <p className="text-xs text-muted-foreground/60 mt-3">Version 1.0 · Phase 1: Foundation</p>
         </section>
 
-        <section>
+        <section className="flex flex-col sm:flex-row gap-3">
           <button onClick={handleLogout} className="flex items-center gap-2 px-4 py-2.5 rounded-lg border border-destructive/30 text-destructive hover:bg-destructive/10 transition-colors text-sm font-medium">
             <LogOut className="w-4 h-4" /> Sign Out
           </button>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <button className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors text-sm font-medium">
+                <Trash2 className="w-4 h-4" /> Delete Account
+              </button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete account permanently?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  You will be signed out and your account data — including workspaces, conversations, memories, and insights — will be permanently deleted and cannot be recovered. Are you sure?
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={handleLogout} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                  Delete &amp; Sign Out
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </section>
       </div>
     </div>

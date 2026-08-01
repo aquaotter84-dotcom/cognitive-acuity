@@ -88,6 +88,7 @@
 
   body {
     @apply bg-background text-foreground font-body antialiased;
+    overscroll-behavior: none;
   }
 }
 
@@ -95,6 +96,7 @@
   .scrollbar-thin {
     scrollbar-width: thin;
     scrollbar-color: hsl(222 14% 25%) transparent;
+    overscroll-behavior: none;
   }
   .scrollbar-thin::-webkit-scrollbar {
     width: 6px;
