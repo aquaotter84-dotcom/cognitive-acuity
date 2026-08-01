@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Copy, Check } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import CouncilTrace from '@/components/chat/CouncilTrace';
+import SpeakButton from '@/components/chat/SpeakButton';
 
 export default function ChatMessage({ message, council, streamingText, isStreaming }) {
   const [copied, setCopied] = useState(false);
@@ -49,10 +50,13 @@ export default function ChatMessage({ message, council, streamingText, isStreami
         </div>
         {council && !isStreaming && <CouncilTrace council={council} />}
         {!isStreaming && (
-          <button onClick={handleCopy} className="mt-1 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
-            {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-            {copied ? 'Copied' : 'Copy'}
-          </button>
+          <div className="mt-1 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+            <button onClick={handleCopy} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
+              {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+              {copied ? 'Copied' : 'Copy'}
+            </button>
+            <SpeakButton text={message.content} />
+          </div>
         )}
       </div>
     </div>

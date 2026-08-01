@@ -1,9 +1,14 @@
 import { useState, useRef, useEffect } from 'react';
-import { Send, Paperclip, Square } from 'lucide-react';
+import { Send, Paperclip, Square, Mic, MicOff } from 'lucide-react';
+import { useSpeechRecognition } from '@/hooks/useVoice';
 
 export default function ChatInput({ onSend, disabled, isProcessing, onStop }) {
   const [text, setText] = useState('');
   const textareaRef = useRef(null);
+  const { supported: micSupported, listening, interim, start, stop } = useSpeechRecognition({
+    onFinal: (t) => setText(prev => (prev ? prev.trim() + ' ' : '') + t)
+  });
+  const displayText = listening && interim ? (text ? text + ' ' : '') + interim : text;
 
   const handleSend = () => {
     const trimmed = text.trim();
@@ -33,9 +38,18 @@ export default function ChatInput({ onSend, disabled, isProcessing, onStop }) {
         <button disabled className="p-2 text-muted-foreground/40 cursor-not-allowed">
           <Paperclip className="w-4 h-4" />
         </button>
+        {micSupported && (
+          <button
+            onClick={() => (listening ? stop() : start())}
+            className={`p-2 rounded-xl transition-colors ${listening ? 'bg-destructive text-destructive-foreground animate-pulse' : 'text-muted-foreground hover:text-foreground'}`}
+            title={listening ? 'Stop listening' : 'Speak'}
+          >
+            {listening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+          </button>
+        )}
         <textarea
           ref={textareaRef}
-          value={text}
+          value={displayText}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder="Message COGNOS..."

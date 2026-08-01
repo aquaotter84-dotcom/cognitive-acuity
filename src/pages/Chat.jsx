@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
-import { Menu } from 'lucide-react';
+import { Menu, Volume2, VolumeX } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
+import { useSpeechSynthesis } from '@/hooks/useVoice';
 import { useCognos } from '@/lib/cognosContext';
 import ChatMessage from '@/components/chat/ChatMessage';
 import ChatInput from '@/components/chat/ChatInput';
@@ -14,8 +15,11 @@ export default function Chat() {
   const [conversationSummary, setConversationSummary] = useState(null);
   const [style, setStyle] = useState('balanced');
   const [streaming, setStreaming] = useState(null);
+  const [autoSpeak, setAutoSpeak] = useState(false);
   const abortRef = useRef(false);
+  const autoSpeakRef = useRef(false);
   const messagesEndRef = useRef(null);
+  const { speak, cancel } = useSpeechSynthesis();
 
   useEffect(() => {
     if (activeConversationId) {
@@ -34,6 +38,8 @@ export default function Chat() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isProcessing]);
+
+  useEffect(() => { autoSpeakRef.current = autoSpeak; }, [autoSpeak]);
 
   const handleSend = async (text) => {
     if (!activeWorkspace || isProcessing) return;
@@ -138,7 +144,9 @@ export default function Chat() {
   useEffect(() => {
     if (!streaming) return;
     if (streaming.revealed.length >= streaming.full.length) {
+      const fullText = streaming.full;
       const t = setTimeout(() => {
+        if (autoSpeakRef.current) speak(fullText);
         setStreaming(null);
         setIsProcessing(false);
       }, 80);
@@ -161,6 +169,13 @@ export default function Chat() {
           <h2 className="text-sm font-medium truncate">{activeWorkspace?.name || 'COGNOS'}</h2>
           {conversationSummary && <p className="text-xs text-muted-foreground truncate">{conversationSummary}</p>}
         </div>
+        <button
+          onClick={() => { const v = !autoSpeak; setAutoSpeak(v); if (!v) cancel(); }}
+          className={`p-1.5 rounded-lg transition-colors ${autoSpeak ? 'text-primary bg-primary/10' : 'text-muted-foreground hover:text-foreground'}`}
+          title={autoSpeak ? 'Auto-listen on' : 'Auto-listen off'}
+        >
+          {autoSpeak ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+        </button>
         <select
           value={style}
           onChange={(e) => setStyle(e.target.value)}
