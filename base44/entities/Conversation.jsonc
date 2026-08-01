@@ -22,6 +22,14 @@
     "last_message_preview": {
       "type": "string",
       "description": "Preview text of the last message for sidebar display"
+    },
+    "member_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "User ids who can see this conversation (copied from the workspace at creation). RLS enforces member visibility.",
+      "default": []
     }
   },
   "required": [
@@ -33,6 +41,9 @@
       "$or": [
         {
           "created_by_id": "{{user.id}}"
+        },
+        {
+          "data.member_ids": "{{user.id}}"
         },
         {
           "user_condition": {
