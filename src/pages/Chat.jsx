@@ -179,15 +179,20 @@ export default function Chat() {
           <h2 className="text-sm font-medium truncate">{activeWorkspace?.name || 'COGNOS'}</h2>
           {conversationSummary && <p className="text-xs text-muted-foreground truncate">{conversationSummary}</p>}
         </div>
-        {conv.supported && (
-          <button
-            onClick={() => conv.active ? conv.deactivate() : conv.activate()}
-            className={`p-1.5 rounded-lg transition-colors ${conv.active ? 'text-primary bg-primary/10' : 'text-muted-foreground hover:text-foreground'}`}
-            title={conv.active ? 'End conversation mode' : 'Conversation mode'}
-          >
-            {conv.active ? <PhoneOff className="w-4 h-4" /> : <Phone className="w-4 h-4" />}
-          </button>
-        )}
+        <button
+          onClick={() => conv.supported && (conv.active ? conv.deactivate() : conv.activate())}
+          disabled={!conv.supported}
+          className={`p-1.5 rounded-lg transition-colors ${
+            !conv.supported
+              ? 'text-muted-foreground/30 cursor-not-allowed'
+              : conv.active
+                ? 'text-primary bg-primary/10'
+                : 'text-muted-foreground hover:text-foreground'
+          }`}
+          title={!conv.supported ? "Voice conversation isn't supported in this browser" : conv.active ? 'End conversation mode' : 'Conversation mode'}
+        >
+          {conv.active ? <PhoneOff className="w-4 h-4" /> : <Phone className="w-4 h-4" />}
+        </button>
         <button
           onClick={() => { const v = !autoSpeak; setAutoSpeak(v); if (!v) cancel(); }}
           className={`p-1.5 rounded-lg transition-colors ${autoSpeak ? 'text-primary bg-primary/10' : 'text-muted-foreground hover:text-foreground'}`}
