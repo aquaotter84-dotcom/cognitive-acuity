@@ -1,9 +1,16 @@
-// Core runtime — the agent contract. A plain factory; dispatch is handled by
-// the shared council pipeline (runCouncil), so there is no separate
-// orchestrator/registry/eventBus layer. Operators are plain async functions.
+// Core runtime — defines the agent/handler contract and a runner that executes a
+// handler against a protocol message. Phase 1: a plain function-based contract.
+
+import { validateMessage } from "./protocol.ts";
 
 export function defineAgent({ name, type = "handler", handle }) {
   if (!name || typeof name !== "string") throw new Error("Agent requires a name");
   if (typeof handle !== "function") throw new Error(`Agent "${name}" requires a handle() function`);
   return { name, type, handle };
+}
+
+export async function runAgent(agent, message, ctx) {
+  const err = validateMessage(message);
+  if (err) throw new Error(`Invalid message for ${agent.name}: ${err}`);
+  return agent.handle(message, ctx);
 }

@@ -1,7 +1,7 @@
-// runCouncilAutonomous — Phase 11 (Autonomous Workflows). Runs the shared
-// council pipeline WITHOUT a live conversation: the council deliberates on a
-// topic and persists an Insight. Reuses runCouncil (the same pipeline as
-// chatOrchestrate) — one orchestration engine, two entrypoints.
+// runCouncilAutonomous — Phase 11 (Autonomous Workflows). Runs the full council
+// pipeline WITHOUT a live conversation: the council deliberates on a topic and
+// persists an Insight. Reuses the same Observer → Strategist → Specialist →
+// Synthesizer → Critic (revision loop) → Governor pipeline as chatOrchestrate.
 //
 // Invoked either with a specific workspaceId (manual, from the Insights UI) or
 // with no args to deliberate for every workspace (the scheduled-workflow path).
@@ -11,8 +11,12 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.40';
 import { createLogger } from "../../shared/logging.ts";
 import { getSystemConfig } from "../../shared/config.ts";
+import { createRegistry } from "../../shared/registry.ts";
+import { createEventBus } from "../../shared/eventBus.ts";
+import { createOrchestrator } from "../../shared/orchestrator.ts";
+import { createMessage } from "../../shared/protocol.ts";
 import { wrapHandler } from "../../shared/errors.ts";
-import { runCouncil } from "../../shared/council/pipeline.ts";
+import { registerCouncil } from "../../shared/council/index.ts";
 
 const rootLogger = createLogger("runCouncilAutonomous");
 
@@ -47,23 +51,69 @@ async function buildContext(base44, workspaceId, topic) {
 async function runForWorkspace(base44, workspaceId, topic, trigger, logger) {
   const config = getSystemConfig();
   const subLogger = logger.child("workspace");
-  const ctx = { base44, config, logger: subLogger, timings: {} };
+  const registry = createRegistry();
+  const eventBus = createEventBus(subLogger);
+  const orchestrator = createOrchestrator({ registry, eventBus, logger: subLogger });
+  registerCouncil(registry);
+  const ctx = { base44, config, logger: subLogger };
 
   const { workspace, memories, userMessage } = await buildContext(base44, workspaceId, topic);
 
-  const result = await runCouncil(ctx, {
-    userMessage,
-    conversationId: null,
-    workspaceId,
-    history: [],
-    memories,
-    workspace,
-    style: undefined,
-    attachments: [],
-    webSearch: false
-  });
+  // Observer (perception)
+  const observerResult = await orchestrator.dispatch("observer", createMessage({
+    type: "council.observe", from: "autonomous",
+    content: { userMessage, workspaceId, conversationId: null, history: [], memories, workspace, style: undefined }
+  }), ctx);
 
-  const responseText = result.responseText || "";
+  // Strategist (planning)
+  const strategistResult = await orchestrator.dispatch("strategist", createMessage({
+    type: "council.plan", from: "autonomous", content: observerResult
+  }), ctx);
+
+  // Specialist (execution)
+  const specialistResult = await orchestrator.dispatch("specialist", createMessage({
+    type: "council.execute", from: "autonomous", content: strategistResult
+  }), ctx);
+
+  // Synthesizer (integration)
+  let currentResponse = await orchestrator.dispatch("synthesizer", createMessage({
+    type: "council.synthesize", from: "autonomous", content: specialistResult
+  }), ctx);
+
+  // Critic-driven revision loop
+  let criticResult = await orchestrator.dispatch("critic", createMessage({
+    type: "council.critique", from: "autonomous", content: currentResponse
+  }), ctx);
+  const maxRevisions = ctx.config.council.maxRevisions || 0;
+  const threshold = ctx.config.council.revisionScoreThreshold || 0;
+  let revisionCount = 0;
+  let revisionTriggered = false;
+  while (
+    maxRevisions > 0 &&
+    revisionCount < maxRevisions &&
+    criticResult.evaluation &&
+    !criticResult.evaluation.skipped &&
+    criticResult.evaluation.needs_revision === true &&
+    typeof criticResult.evaluation.score === "number" &&
+    criticResult.evaluation.score < threshold
+  ) {
+    revisionTriggered = true;
+    revisionCount++;
+    currentResponse = await orchestrator.dispatch("synthesizer", createMessage({
+      type: "council.revise", from: "autonomous",
+      content: { ...currentResponse, critique: criticResult.evaluation, revision: true }
+    }), ctx);
+    criticResult = await orchestrator.dispatch("critic", createMessage({
+      type: "council.critique", from: "autonomous", content: currentResponse
+    }), ctx);
+  }
+
+  // Governor (sovereignty)
+  const governorResult = await orchestrator.dispatch("governor", createMessage({
+    type: "council.govern", from: "autonomous", content: { responseText: currentResponse.responseText }
+  }), ctx);
+
+  const responseText = currentResponse.responseText || "";
   const title = (responseText.split('\n').map(l => l.trim()).find(Boolean) || topic || 'Autonomous insight')
     .replace(/^#+\s*/, '').slice(0, 100);
   const memberIds = workspace.member_ids && workspace.member_ids.length ? workspace.member_ids : [];
@@ -74,14 +124,14 @@ async function runForWorkspace(base44, workspaceId, topic, trigger, logger) {
     content: responseText || '(no output)',
     trigger_type: trigger,
     topic: topic || 'daily_briefing',
-    task_type: result.taskType || result.classification?.task_type || 'analysis',
-    model_used: result.modelUsed || config.models.primary,
+    task_type: currentResponse.taskType || observerResult.classification?.task_type || 'analysis',
+    model_used: currentResponse.modelUsed || config.models.primary,
     council: {
-      classification: result.classification,
-      plan: result.plan,
-      critic: result.critic,
-      revisions: result.revisions,
-      governor: { approved: result.governor.approved, flags: result.governor.flags }
+      classification: observerResult.classification,
+      plan: strategistResult.plan,
+      critic: criticResult.evaluation,
+      revisions: { count: revisionCount, triggered: revisionTriggered, maxRevisions },
+      governor: { approved: governorResult.approved, flags: governorResult.flags }
     },
     member_ids: memberIds,
     is_read: false
@@ -92,8 +142,8 @@ async function runForWorkspace(base44, workspaceId, topic, trigger, logger) {
     insightId: insight.id,
     title,
     trigger,
-    criticScore: result.critic?.score ?? null,
-    governorApproved: result.governor.approved
+    criticScore: criticResult.evaluation?.score ?? null,
+    governorApproved: governorResult.approved
   };
 }
 

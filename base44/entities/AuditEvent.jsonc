@@ -64,12 +64,6 @@
     "error_message": {
       "type": "string",
       "description": "Error details if status is error"
-    },
-    "stage_timings": {
-      "type": "object",
-      "description": "Per-stage latency from the council pipeline: { stage: { totalMs, runs, lastStatus } }. Persisted so the Activity dashboard can show where time (and failures) concentrate, not just the wall total.",
-      "properties": {},
-      "default": {}
     }
   },
   "required": [
