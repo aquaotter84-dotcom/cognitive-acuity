@@ -16,7 +16,7 @@ export default function WelcomeScreen({ onSuggestion }) {
       <Image
         src={COGNOS_LOGO}
         fittingType="fit"
-        className="w-40 h-40 mb-6 mix-blend-screen"
+        className="w-[400px] h-[400px] mb-6 mix-blend-screen"
         alt="COGNOS"
       />
       <h1 className="text-2xl font-bold tracking-tight mb-2">Welcome to COGNOS</h1>

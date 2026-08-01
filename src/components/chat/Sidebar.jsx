@@ -36,7 +36,7 @@ export default function Sidebar({ onNavigate }) {
         <Image
           src={COGNOS_LOGO}
           fittingType="fit"
-          className="h-9 w-24 mix-blend-screen"
+          className="h-[90px] w-[240px] mix-blend-screen"
           alt="COGNOS"
         />
       </div>
