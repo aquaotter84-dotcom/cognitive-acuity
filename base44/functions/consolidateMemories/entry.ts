@@ -1,5 +1,5 @@
 // Memory consolidation — Phase 5. Merges near-duplicate / overlapping memories within
-// a workspace into a single semantic memory and disables the redundant originals.
+// a workspace into a single semantic memory and deletes the redundant originals.
 // Invoked either with a specific workspaceId (user-scope) or with no args to
 // consolidate every workspace (the scheduled workflow path). Uses the service role
 // so it can read/write memories across the workspace regardless of RLS.
@@ -112,10 +112,10 @@ async function consolidateWorkspace(base44, workspaceId) {
     created++;
     for (const id of ids) {
       try {
-        await base44.asServiceRole.entities.Memory.update(id, { is_enabled: false });
+        await base44.asServiceRole.entities.Memory.delete(id);
         disabled++;
       } catch (e) {
-        logger.warn("disable failed", { id, error: String(e) });
+        logger.warn("delete failed", { id, error: String(e) });
       }
     }
     merged++;
