@@ -4,7 +4,7 @@
   "properties": {
     "workspace_id": {
       "type": "string",
-      "description": "Reference to the workspace this memory belongs to"
+      "description": "Reference to the workspace this memory belongs to. A memory lives in one workspace; sharing it into a shared workspace moves it here (consent), revoking returns it to the owner's personal workspace."
     },
     "content": {
       "type": "string",
@@ -68,6 +68,14 @@
         "type": "string"
       },
       "description": "Tags for categorizing and searching memories"
+    },
+    "member_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "User ids who can see this memory. Personal memory: [owner]. Shared memory: the shared workspace's members. RLS enforces read; only the memory owner (created_by_id) may update/delete \u2014 so sharing (consent) is the owner's explicit, reversible act.",
+      "default": []
     }
   },
   "required": [
@@ -79,6 +87,9 @@
       "$or": [
         {
           "created_by_id": "{{user.id}}"
+        },
+        {
+          "data.member_ids": "{{user.id}}"
         },
         {
           "user_condition": {
