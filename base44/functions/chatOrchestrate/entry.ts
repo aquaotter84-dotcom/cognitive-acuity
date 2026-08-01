@@ -1,109 +1,145 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.40';
+import { secrets } from "base44:runtime";
+
+// Phase 1 nervous system
+import { createLogger } from "../../shared/logging.ts";
+import { getSystemConfig } from "../../shared/config.ts";
+import { createRegistry } from "../../shared/registry.ts";
+import { createEventBus } from "../../shared/eventBus.ts";
+import { createOrchestrator } from "../../shared/orchestrator.ts";
+import { defineAgent } from "../../shared/runtime.ts";
+import { createMessage } from "../../shared/protocol.ts";
+import { CognosError, wrapHandler } from "../../shared/errors.ts";
 
 const OPENAI_URL = 'https://openrouter.ai/api/v1/chat/completions';
+const rootLogger = createLogger("chatOrchestrate");
 
-Deno.serve(async (req) => {
-  try {
-    const base44 = createClientFromRequest(req);
-    const user = await base44.auth.me();
-    if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
+async function handle(req) {
+  const base44 = createClientFromRequest(req);
+  const user = await base44.auth.me();
+  if (!user) throw new CognosError("Unauthorized", { code: "AUTH", category: "auth", status: 401 });
 
-    const body = await req.json();
-    const { conversationId, workspaceId, userMessage } = body;
-    if (!conversationId || !workspaceId || !userMessage) {
-      return Response.json({ error: 'Missing required fields' }, { status: 400 });
+  const body = await req.json();
+  const { conversationId, workspaceId, userMessage } = body;
+  if (!conversationId || !workspaceId || !userMessage) {
+    throw new CognosError("Missing required fields", { code: "VALIDATION", category: "input", status: 400 });
+  }
+
+  const apiKey = secrets.get("Api_key");
+  if (!apiKey) throw new CognosError("API key not configured", { code: "CONFIG", category: "secrets", status: 500 });
+
+  // --- Nervous system setup ---
+  const config = getSystemConfig();
+  const logger = rootLogger.child("orchestrator");
+  const registry = createRegistry();
+  const eventBus = createEventBus(logger);
+  const orchestrator = createOrchestrator({ registry, eventBus, logger });
+
+  eventBus.subscribe("orchestration.stage.start", (e) => logger.info("stage.start", e));
+  eventBus.subscribe("orchestration.stage.complete", (e) => logger.info("stage.complete", e));
+
+  // --- Stage: context assembly ---
+  const contextAgent = defineAgent({
+    name: "contextAssembly",
+    type: "stage",
+    async handle(message, ctx) {
+      const { conversationId, workspaceId, userMessage } = message.content;
+      const messages = await ctx.base44.entities.Message.filter(
+        { conversation_id: conversationId },
+        '-created_date',
+        ctx.config.orchestrator.maxHistoryMessages
+      );
+      const history = [...messages].reverse();
+      const memories = await ctx.base44.entities.Memory.filter(
+        { workspace_id: workspaceId, is_enabled: true },
+        '-importance',
+        ctx.config.orchestrator.maxMemories
+      );
+      const workspace = await ctx.base44.entities.Workspace.get(workspaceId);
+      return { conversationId, workspaceId, userMessage, history, memories, workspace };
     }
+  });
 
-    const apiKey = Deno.env.get("Api_key");
-    if (!apiKey) return Response.json({ error: 'API key not configured' }, { status: 500 });
-
-    const startTime = Date.now();
-
-    // --- CONTEXT ASSEMBLY AGENT ---
-    const messages = await base44.entities.Message.filter(
-      { conversation_id: conversationId },
-      '-created_date',
-      20
-    );
-    const history = [...messages].reverse();
-
-    const memories = await base44.entities.Memory.filter(
-      { workspace_id: workspaceId, is_enabled: true },
-      '-importance',
-      10
-    );
-
-    const workspace = await base44.entities.Workspace.get(workspaceId);
-
-    // Build system prompt with workspace instructions and memories
-    let systemPrompt = 'You are COGNOS, an intelligent AI reasoning assistant. You provide thoughtful, accurate, and helpful responses. Use markdown formatting when appropriate for clarity.';
-    if (workspace.instructions) {
-      systemPrompt += `\n\nWORKSPACE INSTRUCTIONS:\n${workspace.instructions}`;
-    }
-    if (memories && memories.length > 0) {
-      systemPrompt += `\n\nRELEVANT MEMORIES:\n${memories.map(m => `- ${m.content}`).join('\n')}`;
-    }
-
-    // Build chat messages array
-    const chatMessages = [
-      { role: 'system', content: systemPrompt },
-      ...history.map(msg => ({ role: msg.role, content: msg.content })),
-      { role: 'user', content: userMessage }
-    ];
-
-    // --- ORCHESTRATOR AGENT: Main LLM call via OpenAI ---
-    const llmResponse = await fetch(OPENAI_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
-        'HTTP-Referer': 'https://cognos.app',
-        'X-Title': 'COGNOS'
-      },
-      body: JSON.stringify({
-        model: 'openai/gpt-4o',
-        messages: chatMessages,
-        max_tokens: 2000
-      })
-    });
-
-    if (!llmResponse.ok) {
-      const errText = await llmResponse.text();
-      return Response.json({ error: `Model API error (${llmResponse.status}): ${errText}` }, { status: 502 });
-    }
-
-    const llmData = await llmResponse.json();
-    const responseText = llmData.choices[0].message.content;
-
-    // --- MEMORY AGENT: Extract memories (best-effort) ---
-    try {
-      const memResponse = await fetch(OPENAI_URL, {
+  // --- Stage: LLM response ---
+  const llmAgent = defineAgent({
+    name: "llmRespond",
+    type: "stage",
+    async handle(message, ctx) {
+      const { history, memories, workspace, userMessage } = message.content;
+      let systemPrompt = 'You are COGNOS, an intelligent AI reasoning assistant. You provide thoughtful, accurate, and helpful responses. Use markdown formatting when appropriate for clarity.';
+      if (workspace.instructions) {
+        systemPrompt += `\n\nWORKSPACE INSTRUCTIONS:\n${workspace.instructions}`;
+      }
+      if (memories && memories.length > 0) {
+        systemPrompt += `\n\nRELEVANT MEMORIES:\n${memories.map(m => `- ${m.content}`).join('\n')}`;
+      }
+      const chatMessages = [
+        { role: 'system', content: systemPrompt },
+        ...history.map(msg => ({ role: msg.role, content: msg.content })),
+        { role: 'user', content: userMessage }
+      ];
+      const llmResponse = await fetch(OPENAI_URL, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`
+          'Authorization': `Bearer ${ctx.apiKey}`,
+          'HTTP-Referer': 'https://cognos.app',
+          'X-Title': 'COGNOS'
         },
         body: JSON.stringify({
-          model: 'openai/gpt-4o-mini',
-          messages: [
-            {
-              role: 'system',
-              content: 'You are a memory extraction agent. Analyze the conversation and extract any important facts, preferences, or information worth remembering for future conversations. Only extract genuinely useful, long-term information — not casual conversation. Return a JSON object with a "memories" array. Each memory has "content" (string), "memory_type" ("episodic" or "semantic"), and "importance" (1-10 integer). Return {"memories": []} if nothing is worth remembering.'
-            },
-            {
-              role: 'user',
-              content: `User: ${userMessage}\nAssistant: ${responseText}`
-            }
-          ],
-          max_tokens: 500,
-          response_format: { type: 'json_object' }
+          model: ctx.config.models.primary,
+          messages: chatMessages,
+          max_tokens: ctx.config.limits.responseMaxTokens
         })
       });
+      if (!llmResponse.ok) {
+        const errText = await llmResponse.text();
+        throw new CognosError(`Model API error (${llmResponse.status}): ${errText}`, { code: "LLM_ERROR", category: "model", status: 502 });
+      }
+      const llmData = await llmResponse.json();
+      return {
+        responseText: llmData.choices[0].message.content,
+        taskType: 'conversation',
+        modelUsed: ctx.config.models.primary
+      };
+    }
+  });
 
-      if (memResponse.ok) {
+  // --- Stage: memory extraction (best-effort) ---
+  const memoryAgent = defineAgent({
+    name: "memoryExtraction",
+    type: "post",
+    async handle(message, ctx) {
+      const { workspaceId, conversationId, userMessage, responseText } = message.content;
+      try {
+        const memResponse = await fetch(OPENAI_URL, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${ctx.apiKey}`
+          },
+          body: JSON.stringify({
+            model: ctx.config.models.memory,
+            messages: [
+              {
+                role: 'system',
+                content: 'You are a memory extraction agent. Analyze the conversation and extract any important facts, preferences, or information worth remembering for future conversations. Only extract genuinely useful, long-term information — not casual conversation. Return a JSON object with a "memories" array. Each memory has "content" (string), "memory_type" ("episodic" or "semantic"), and "importance" (1-10 integer). Return {"memories": []} if nothing is worth remembering.'
+              },
+              {
+                role: 'user',
+                content: `User: ${userMessage}\nAssistant: ${responseText}`
+              }
+            ],
+            max_tokens: ctx.config.limits.memoryMaxTokens,
+            response_format: { type: 'json_object' }
+          })
+        });
+        if (!memResponse.ok) {
+          ctx.logger.warn("memory extraction model call failed", { status: memResponse.status });
+          return;
+        }
         const memData = await memResponse.json();
         const memResult = JSON.parse(memData.choices[0].message.content);
-
         if (memResult?.memories && memResult.memories.length > 0) {
           const records = memResult.memories
             .filter(m => m.content && m.content.trim().length > 5)
@@ -116,39 +152,96 @@ Deno.serve(async (req) => {
               is_enabled: true
             }));
           if (records.length > 0) {
-            await base44.entities.Memory.bulkCreate(records);
+            await ctx.base44.entities.Memory.bulkCreate(records);
           }
         }
+      } catch (e) {
+        ctx.logger.warn("memory extraction failed", { error: String(e) });
       }
-    } catch (_memError) {
-      // Memory extraction is best-effort
     }
+  });
 
-    // --- AUDIT LOG ---
-    const latency = Date.now() - startTime;
-    try {
-      await base44.entities.AuditEvent.create({
-        user_id: user.id,
-        workspace_id: workspaceId,
-        conversation_id: conversationId,
-        event_type: 'agent_invocation',
-        agent_type: 'orchestrator',
-        model_used: 'openai/gpt-4o',
-        task_type: 'conversation',
-        latency_ms: latency,
-        status: 'success'
-      });
-    } catch (_auditError) {
-      // Best-effort
+  // --- Stage: audit log (best-effort) ---
+  const auditAgent = defineAgent({
+    name: "auditLog",
+    type: "post",
+    async handle(message, ctx) {
+      const { userId, workspaceId, conversationId, modelUsed, taskType, latencyMs, status } = message.content;
+      try {
+        await ctx.base44.entities.AuditEvent.create({
+          user_id: userId,
+          workspace_id: workspaceId,
+          conversation_id: conversationId,
+          event_type: 'agent_invocation',
+          agent_type: 'orchestrator',
+          model_used: modelUsed,
+          task_type: taskType,
+          latency_ms: latencyMs,
+          status: status
+        });
+      } catch (e) {
+        ctx.logger.warn("audit log failed", { error: String(e) });
+      }
     }
+  });
 
-    return Response.json({
-      response: responseText,
-      taskType: 'conversation',
-      modelUsed: 'openai/gpt-4o',
-      latencyMs: latency
-    });
-  } catch (error) {
-    return Response.json({ error: error.message }, { status: 500 });
-  }
-});
+  registry.register(contextAgent.name, contextAgent);
+  registry.register(llmAgent.name, llmAgent);
+  registry.register(memoryAgent.name, memoryAgent);
+  registry.register(auditAgent.name, auditAgent);
+
+  const ctx = { base44, apiKey, config, logger };
+
+  const startTime = Date.now();
+
+  // --- Orchestrate the pipeline ---
+  const contextMsg = createMessage({
+    type: "context.request",
+    from: "orchestrator",
+    content: { conversationId, workspaceId, userMessage }
+  });
+  const contextResult = await orchestrator.dispatch("contextAssembly", contextMsg, ctx);
+
+  const llmMsg = createMessage({
+    type: "llm.request",
+    from: "orchestrator",
+    content: contextResult
+  });
+  const llmResult = await orchestrator.dispatch("llmRespond", llmMsg, ctx);
+
+  const latencyMs = Date.now() - startTime;
+
+  // --- Post-response stages (best-effort, awaited to preserve prior ordering) ---
+  const memMsg = createMessage({
+    type: "memory.request",
+    from: "orchestrator",
+    content: { workspaceId, conversationId, userMessage, responseText: llmResult.responseText }
+  });
+  await orchestrator.dispatch("memoryExtraction", memMsg, ctx);
+
+  const auditMsg = createMessage({
+    type: "audit.request",
+    from: "orchestrator",
+    content: {
+      userId: user.id,
+      workspaceId,
+      conversationId,
+      modelUsed: llmResult.modelUsed,
+      taskType: llmResult.taskType,
+      latencyMs,
+      status: "success"
+    }
+  });
+  await orchestrator.dispatch("auditLog", auditMsg, ctx);
+
+  await eventBus.publish("orchestration.complete", { latencyMs });
+
+  return Response.json({
+    response: llmResult.responseText,
+    taskType: llmResult.taskType,
+    modelUsed: llmResult.modelUsed,
+    latencyMs
+  });
+}
+
+export default wrapHandler(handle, rootLogger);
