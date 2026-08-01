@@ -233,7 +233,7 @@ async function handle(req) {
   registry.register(auditAgent.name, auditAgent);
   registerCouncil(registry);
 
-  const ctx = { base44, config, logger };
+  const ctx = { base44, config, logger, timings: {} };
 
   const startTime = Date.now();
 
@@ -321,6 +321,7 @@ async function handle(req) {
   }
 
   const latencyMs = Date.now() - startTime;
+  logger.info("stage.timings", { latencyMs, stageTimings: ctx.timings });
 
   // --- Phase 2: cognitive layer — governance ---
   const governorMsg = createMessage({
@@ -376,7 +377,8 @@ async function handle(req) {
       subTasks: specialistResult.subTaskOutputs || null,
       critic: criticResult.evaluation,
       revisions: { count: revisionCount, triggered: revisionTriggered, maxRevisions },
-      governor: { approved: governorResult.approved, flags: governorResult.flags }
+      governor: { approved: governorResult.approved, flags: governorResult.flags },
+      stageTimings: ctx.timings || {}
     }
   });
 }

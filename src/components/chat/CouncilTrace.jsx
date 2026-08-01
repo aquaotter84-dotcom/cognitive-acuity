@@ -28,8 +28,8 @@ function Field({ label, value }) {
 export default function CouncilTrace({ council }) {
   const [open, setOpen] = useState(false);
   if (!council) return null;
-  const { classification, plan, subTasks, critic, revisions, governor, modelUsed, latencyMs, memoriesUsed, webSearch } = council || {};
-  if (!classification && !plan && !critic && !webSearch) return null;
+  const { classification, plan, subTasks, critic, revisions, governor, modelUsed, latencyMs, memoriesUsed, webSearch, stageTimings } = council || {};
+  if (!classification && !plan && !critic && !webSearch && !stageTimings) return null;
 
   const score = critic?.score;
   const summary = [
@@ -167,6 +167,37 @@ export default function CouncilTrace({ council }) {
               )}
               {Array.isArray(governor.flags) && governor.flags.length > 0 && (
                 <p className="text-muted-foreground">{governor.flags.join(', ')}</p>
+              )}
+            </Section>
+          )}
+
+          {stageTimings && typeof stageTimings === 'object' && Object.keys(stageTimings).length > 0 && (
+            <Section title="Timing">
+              {(() => {
+                const order = ['contextAssembly', 'observer', 'webSearch', 'strategist', 'specialist', 'synthesizer', 'critic', 'governor', 'memoryExtraction', 'auditLog'];
+                const entries = Object.entries(stageTimings).sort((a, b) => {
+                  const ia = order.indexOf(a[0]); const ib = order.indexOf(b[0]);
+                  return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
+                });
+                const max = Math.max(...entries.map(([, v]) => v.totalMs), 1);
+                return entries.map(([stage, t]) => (
+                  <div key={stage}>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-muted-foreground/80 flex-1 truncate">{stage}</span>
+                      {t.runs > 1 && <span className="text-muted-foreground/50">×{t.runs}</span>}
+                      <span className="text-foreground/80 tabular-nums">{(t.totalMs / 1000).toFixed(1)}s</span>
+                    </div>
+                    <div className="h-1 rounded-full bg-muted mt-0.5 overflow-hidden">
+                      <div className={`h-full rounded-full ${t.lastStatus === 'error' ? 'bg-destructive' : 'bg-primary/60'}`} style={{ width: `${Math.max(2, (t.totalMs / max) * 100)}%` }} />
+                    </div>
+                  </div>
+                ));
+              })()}
+              {latencyMs != null && (
+                <div className="flex justify-between pt-1 text-muted-foreground/60 border-t border-border/40">
+                  <span>wall total</span>
+                  <span className="tabular-nums">{(latencyMs / 1000).toFixed(1)}s</span>
+                </div>
               )}
             </Section>
           )}
