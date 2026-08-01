@@ -10,6 +10,7 @@ export default function Chat() {
   const { activeWorkspace, activeConversationId, setActiveConversationId, refreshConversations, openSidebar } = useCognos();
   const [messages, setMessages] = useState([]);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [councilTraces, setCouncilTraces] = useState({});
   const messagesEndRef = useRef(null);
 
   useEffect(() => {
@@ -67,7 +68,7 @@ export default function Chat() {
         userMessage: text
       });
 
-      const { response: aiResponse, taskType, modelUsed } = result.data;
+      const { response: aiResponse, taskType, modelUsed, latencyMs, council } = result.data;
 
       const assistantMsg = await base44.entities.Message.create({
         conversation_id: convId,
@@ -79,6 +80,9 @@ export default function Chat() {
         processing_status: 'complete'
       });
       setMessages(prev => [...prev, assistantMsg]);
+      if (council) {
+        setCouncilTraces(prev => ({ ...prev, [assistantMsg.id]: { ...council, modelUsed, taskType, latencyMs } }));
+      }
 
       await base44.entities.Conversation.update(convId, {
         last_message_preview: aiResponse.slice(0, 100)
@@ -115,7 +119,7 @@ export default function Chat() {
         ) : (
           <div className="max-w-3xl mx-auto px-4 py-6 space-y-6">
             {messages.map(msg => (
-              <ChatMessage key={msg.id} message={msg} />
+              <ChatMessage key={msg.id} message={msg} council={councilTraces[msg.id]} />
             ))}
             {isProcessing && (
               <div className="flex gap-3 animate-fade-in">
