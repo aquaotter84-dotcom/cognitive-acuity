@@ -4,11 +4,12 @@ import { Brain, Plus, Search, FolderKanban, Settings as SettingsIcon, Activity a
 import { useCognos } from '@/lib/cognosContext';
 import { base44 } from '@/api/base44Client';
 import { Image } from '@/components/ui/image';
+import ConversationItem from '@/components/chat/ConversationItem';
 
 const COGNOS_LOGO = 'https://media.base44.com/images/public/6a65b5729b2fe6a520a0ab97/33193cff0_33519d65130b52f40ef3a4c45c04ff98d2430b231b5b15abfd0b3170de405f121.jpg';
 
 export default function Sidebar({ onNavigate }) {
-  const { activeWorkspace, setActiveWorkspace, conversations, activeConversationId, setActiveConversationId } = useCognos();
+  const { activeWorkspace, setActiveWorkspace, conversations, refreshConversations, activeConversationId, setActiveConversationId, currentUser } = useCognos();
   const [search, setSearch] = useState('');
   const [workspaces, setWorkspaces] = useState([]);
 
@@ -28,6 +29,48 @@ export default function Sidebar({ onNavigate }) {
   const handleSelect = (id) => {
     setActiveConversationId(id);
     onNavigate?.();
+  };
+
+  const handleBranch = async (conv) => {
+    if (!activeWorkspace) return;
+    const memberIds = conv.member_ids?.length ? conv.member_ids : [currentUser?.id].filter(Boolean);
+    const branched = await base44.entities.Conversation.create({
+      title: `${conv.title} (branch)`,
+      workspace_id: conv.workspace_id,
+      member_ids: memberIds,
+      last_message_preview: conv.last_message_preview
+    });
+    // Copy the source messages so the branch continues from the same context.
+    const msgs = await base44.entities.Message.filter({ conversation_id: conv.id }, 'created_date', 200);
+    if (msgs.length) {
+      await base44.entities.Message.bulkCreate(
+        msgs.map(m => ({
+          conversation_id: branched.id,
+          workspace_id: conv.workspace_id,
+          role: m.role,
+          content: m.content,
+          model_used: m.model_used,
+          task_type: m.task_type,
+          attachments: m.attachments,
+          processing_status: m.processing_status || 'complete',
+          member_ids: memberIds
+        }))
+      );
+    }
+    await refreshConversations();
+    setActiveConversationId(branched.id);
+    onNavigate?.();
+  };
+
+  const handleDelete = async (id) => {
+    try {
+      await base44.entities.Message.deleteMany({ conversation_id: id });
+      await base44.entities.Conversation.delete(id);
+      if (activeConversationId === id) setActiveConversationId(null);
+      await refreshConversations();
+    } catch (e) {
+      console.error('Failed to delete conversation:', e);
+    }
   };
 
   return (
@@ -80,16 +123,14 @@ export default function Sidebar({ onNavigate }) {
           <p className="text-center text-xs text-muted-foreground py-8">No conversations yet</p>
         ) : (
           filtered.map(conv => (
-            <button
+            <ConversationItem
               key={conv.id}
-              onClick={() => handleSelect(conv.id)}
-              className={`w-full text-left px-3 py-2.5 rounded-lg mb-0.5 transition-colors ${activeConversationId === conv.id ? 'bg-primary/10 text-primary' : 'hover:bg-muted/50'}`}
-            >
-              <p className="text-sm font-medium truncate">{conv.title}</p>
-              {conv.last_message_preview && (
-                <p className="text-xs text-muted-foreground truncate mt-0.5">{conv.last_message_preview}</p>
-              )}
-            </button>
+              conv={conv}
+              isActive={activeConversationId === conv.id}
+              onSelect={handleSelect}
+              onBranch={handleBranch}
+              onDelete={handleDelete}
+            />
           ))
         )}
       </div>
