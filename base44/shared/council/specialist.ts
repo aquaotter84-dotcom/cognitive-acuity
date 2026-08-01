@@ -52,6 +52,10 @@ export const specialistAgent = defineAgent({
     }
 
     // --- Direct path: single contextual response ---
+    // Real-time web search requires a Gemini model with add_context_from_internet.
+    // Attachments (image/file file_urls) are forwarded for multimodal analysis.
+    const { attachments, webSearch } = message.content;
+    const directModel = webSearch ? 'gemini_3_flash' : ctx.config.models.primary;
     const systemPrompt = buildContextSystemPrompt(workspace, memories, classification, undefined, message.content.style);
     const chatMessages = [
       { role: "system", content: systemPrompt },
@@ -59,8 +63,10 @@ export const specialistAgent = defineAgent({
       { role: "user", content: userMessage }
     ];
     const responseText = await callLLM(ctx, {
-      model: ctx.config.models.primary,
-      messages: chatMessages
+      model: directModel,
+      messages: chatMessages,
+      ...(attachments && attachments.length ? { file_urls: attachments.map(a => a.file_url).filter(Boolean) } : {}),
+      ...(webSearch ? { add_context_from_internet: true } : {})
     });
     return {
       ...message.content,
@@ -68,7 +74,7 @@ export const specialistAgent = defineAgent({
       needsSynthesis: false,
       subTaskOutputs: null,
       taskType: classification?.task_type || "conversation",
-      modelUsed: ctx.config.models.primary
+      modelUsed: directModel
     };
   }
 });

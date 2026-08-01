@@ -3,6 +3,7 @@ import { Copy, Check } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import CouncilTrace from '@/components/chat/CouncilTrace';
 import SpeakButton from '@/components/chat/SpeakButton';
+import { Image } from '@/components/ui/image';
 
 export default function ChatMessage({ message, council, streamingText, isStreaming }) {
   const [copied, setCopied] = useState(false);
@@ -20,6 +21,15 @@ export default function ChatMessage({ message, council, streamingText, isStreami
       <div className="flex justify-end animate-message-in">
         <div className="max-w-[80%] bg-primary text-primary-foreground rounded-2xl rounded-br-md px-4 py-2.5">
           <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+          {message.attachments?.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 mt-2">
+              {message.attachments.map((a, i) => (a.file_type || '').startsWith('image/') ? (
+                <Image key={i} src={a.file_url} fittingType="fill" className="w-20 h-20 rounded-lg object-cover" alt={a.name} />
+              ) : (
+                <span key={i} className="text-[10px] bg-primary-foreground/15 px-1.5 py-1 rounded">{a.name}</span>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     );

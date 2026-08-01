@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Menu, Send, Plus, Sparkles, Loader2 } from 'lucide-react';
+import { Menu, Send, Plus, Sparkles, Loader2, Paperclip } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { useCognos } from '@/lib/cognosContext';
 import AgentMessageBubble from '@/components/agent/AgentMessageBubble';
@@ -14,6 +14,24 @@ export default function AgentChat() {
   const [sending, setSending] = useState(false);
   const [loading, setLoading] = useState(true);
   const endRef = useRef(null);
+  const fileInputRef = useRef(null);
+  const [fileUrls, setFileUrls] = useState([]);
+  const [uploading, setUploading] = useState(false);
+
+  const handleFiles = async (fileList) => {
+    const files = Array.from(fileList || []);
+    if (!files.length) return;
+    setUploading(true);
+    try {
+      const urls = [];
+      for (const file of files) {
+        const res = await base44.integrations.Core.UploadFile({ file });
+        if (res?.file_url) urls.push(res.file_url);
+      }
+      setFileUrls(prev => [...prev, ...urls]);
+    } catch (e) { console.error(e); }
+    setUploading(false);
+  };
 
   // On mount: load agent conversations, or create the first one.
   useEffect(() => {
@@ -70,8 +88,9 @@ export default function AgentChat() {
     setSending(true);
     setInput('');
     try {
-      const conv = await base44.agents.addMessage(active, { role: 'user', content: text });
+      const conv = await base44.agents.addMessage(active, { role: 'user', content: text, ...(fileUrls.length ? { file_urls: fileUrls } : {}) });
       setActive(conv);
+      setFileUrls([]);
     } catch (e) {
       console.error(e);
       setInput(text);
@@ -113,7 +132,14 @@ export default function AgentChat() {
       </div>
 
       <div className="border-t border-border bg-background/95 backdrop-blur p-4">
+        {fileUrls.length > 0 && (
+          <div className="max-w-3xl mx-auto mb-2 text-xs text-muted-foreground">{fileUrls.length} attachment(s) ready</div>
+        )}
         <div className="max-w-3xl mx-auto flex items-end gap-2 bg-card border border-border rounded-2xl p-2 focus-within:border-primary/50 transition-colors">
+          <input ref={fileInputRef} type="file" multiple className="hidden" onChange={(e) => { handleFiles(e.target.files); e.target.value = ''; }} />
+          <button onClick={() => fileInputRef.current?.click()} disabled={uploading} className="p-2 text-muted-foreground hover:text-foreground disabled:opacity-50 transition-colors" title="Attach files or images">
+            {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Paperclip className="w-4 h-4" />}
+          </button>
           <textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}

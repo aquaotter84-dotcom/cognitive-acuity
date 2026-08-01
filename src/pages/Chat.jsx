@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Menu, Volume2, VolumeX, Phone, PhoneOff } from 'lucide-react';
+import { Menu, Volume2, VolumeX, Phone, PhoneOff, Globe } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { useSpeechSynthesis } from '@/hooks/useVoice';
 import { useConversationMode } from '@/hooks/useConversationMode';
@@ -18,6 +18,7 @@ export default function Chat() {
   const [style, setStyle] = useState('balanced');
   const [streaming, setStreaming] = useState(null);
   const [autoSpeak, setAutoSpeak] = useState(false);
+  const [webSearch, setWebSearch] = useState(false);
   const abortRef = useRef(false);
   const autoSpeakRef = useRef(false);
   const messagesEndRef = useRef(null);
@@ -47,7 +48,7 @@ export default function Chat() {
   useEffect(() => { autoSpeakRef.current = autoSpeak; }, [autoSpeak]);
   useEffect(() => { convActiveRef.current = conv.active; }, [conv.active]);
 
-  const handleSend = async (text) => {
+  const handleSend = async (text, attachments = []) => {
     if (!activeWorkspace || isProcessing) return;
 
     let convId = activeConversationId;
@@ -71,6 +72,7 @@ export default function Chat() {
       workspace_id: activeWorkspace.id,
       role: 'user',
       content: text,
+      attachments: attachments.length ? attachments : undefined,
       processing_status: 'complete',
       member_ids: memberIds
     });
@@ -90,7 +92,9 @@ export default function Chat() {
         conversationId: convId,
         workspaceId: activeWorkspace.id,
         userMessage: text,
-        style
+        style,
+        attachments,
+        webSearch
       });
 
       if (abortRef.current) return;
@@ -179,6 +183,13 @@ export default function Chat() {
           <h2 className="text-sm font-medium truncate">{activeWorkspace?.name || 'COGNOS'}</h2>
           {conversationSummary && <p className="text-xs text-muted-foreground truncate">{conversationSummary}</p>}
         </div>
+        <button
+          onClick={() => setWebSearch(v => !v)}
+          className={`p-1.5 rounded-lg transition-colors ${webSearch ? 'text-primary bg-primary/10' : 'text-muted-foreground hover:text-foreground'}`}
+          title={webSearch ? 'Web search on' : 'Web search off'}
+        >
+          <Globe className="w-4 h-4" />
+        </button>
         <button
           onClick={() => conv.supported && (conv.active ? conv.deactivate() : conv.activate())}
           disabled={!conv.supported}

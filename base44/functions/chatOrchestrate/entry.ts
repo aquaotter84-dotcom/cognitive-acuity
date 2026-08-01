@@ -120,7 +120,7 @@ async function handle(req) {
   if (!user) throw new CognosError("Unauthorized", { code: "AUTH", category: "auth", status: 401 });
 
   const body = await req.json();
-  const { conversationId, workspaceId, userMessage, style } = body;
+  const { conversationId, workspaceId, userMessage, style, attachments, webSearch } = body;
   if (!conversationId || !workspaceId || !userMessage) {
     throw new CognosError("Missing required fields", { code: "VALIDATION", category: "input", status: 400 });
   }
@@ -155,7 +155,7 @@ async function handle(req) {
       );
       const memories = await selectRelevantMemories(ctx, userMessage, pool, ctx.config.orchestrator.maxMemories);
       const workspace = await ctx.base44.entities.Workspace.get(workspaceId);
-      return { conversationId, workspaceId, userMessage, history, memories, workspace };
+      return { ...message.content, history, memories, workspace };
     }
   });
 
@@ -241,7 +241,7 @@ async function handle(req) {
   const contextMsg = createMessage({
     type: "context.request",
     from: "orchestrator",
-    content: { conversationId, workspaceId, userMessage, style }
+    content: { conversationId, workspaceId, userMessage, style, attachments: attachments || [], webSearch: !!webSearch }
   });
   const contextResult = await orchestrator.dispatch("contextAssembly", contextMsg, ctx);
 

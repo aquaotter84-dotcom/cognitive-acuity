@@ -8,13 +8,15 @@
 
 import { withCharter } from "./council/charter.ts";
 
-export async function callLLM(ctx, { messages, responseJsonSchema = null, model = null }) {
+export async function callLLM(ctx, { messages, responseJsonSchema = null, model = null, file_urls = null, add_context_from_internet = null }) {
   const prompt = messages
     .map(m => (m.role === "system" ? m.content : `${m.role === "assistant" ? "Assistant" : "User"}: ${m.content}`))
     .join("\n\n");
   const args = { prompt };
   if (model) args.model = model;
   if (responseJsonSchema) args.response_json_schema = responseJsonSchema;
+  if (file_urls) args.file_urls = file_urls;
+  if (add_context_from_internet) args.add_context_from_internet = true;
   const res = await ctx.base44.asServiceRole.integrations.Core.InvokeLLM(args);
   return res;
 }
