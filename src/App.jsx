@@ -18,6 +18,10 @@ import AgentChat from '@/pages/AgentChat';
 import About from '@/pages/About';
 import Contact from '@/pages/Contact';
 import PublicLayout from '@/components/PublicLayout';
+import Login from '@/pages/Login';
+import Register from '@/pages/Register';
+import ForgotPassword from '@/pages/ForgotPassword';
+import ResetPassword from '@/pages/ResetPassword';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -56,6 +60,10 @@ const AuthenticatedApp = () => {
           <Route path="/activity" element={<Activity />} />
         </Route>
       </Route>
+      <Route path="/login" element={<Login />} />
+      <Route path="/register" element={<Register />} />
+      <Route path="/forgot-password" element={<ForgotPassword />} />
+      <Route path="/reset-password" element={<ResetPassword />} />
       <Route element={<PublicLayout />}>
         <Route path="/about" element={<About />} />
         <Route path="/contact" element={<Contact />} />
