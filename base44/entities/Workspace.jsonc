@@ -28,6 +28,22 @@
       "type": "boolean",
       "description": "Whether this is the user's default workspace",
       "default": false
+    },
+    "member_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "User ids who are members of this workspace (includes the owner). The source of truth for membership; new conversations, messages, and shared memories copy this list at creation so RLS can enforce member access without a cross-record join.",
+      "default": []
+    },
+    "member_emails": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Display-only mirror of member_ids (emails). Denormalized at invite time so a non-admin owner can show membership without an admin-only User lookup.",
+      "default": []
     }
   },
   "required": [
@@ -38,6 +54,9 @@
       "$or": [
         {
           "created_by_id": "{{user.id}}"
+        },
+        {
+          "data.member_ids": "{{user.id}}"
         },
         {
           "user_condition": {
