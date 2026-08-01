@@ -28,7 +28,7 @@ function Field({ label, value }) {
 export default function CouncilTrace({ council }) {
   const [open, setOpen] = useState(false);
   if (!council) return null;
-  const { classification, plan, subTasks, critic, revisions, governor, modelUsed, latencyMs } = council || {};
+  const { classification, plan, subTasks, critic, revisions, governor, modelUsed, latencyMs, memoriesUsed } = council || {};
   if (!classification && !plan && !critic) return null;
 
   const score = critic?.score;
@@ -57,6 +57,13 @@ export default function CouncilTrace({ council }) {
 
       {open && (
         <div className="px-3 pb-3 space-y-3 border-t border-border/60 pt-3">
+          {Array.isArray(memoriesUsed) && memoriesUsed.length > 0 && (
+            <Section title={`Memory (${memoriesUsed.length})`}>
+              {memoriesUsed.map(m => (
+                <p key={m.id} className="text-muted-foreground/80 leading-relaxed">• {m.preview}</p>
+              ))}
+            </Section>
+          )}
           {classification && (
             <Section title="Observer">
               <Field label="Task" value={classification.task_type} />

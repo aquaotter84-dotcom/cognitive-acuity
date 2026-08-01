@@ -31,6 +31,53 @@ const MEMORY_SCHEMA = {
   }
 };
 
+const MEMORY_RELEVANCE_SCHEMA = {
+  type: "object",
+  properties: {
+    relevant_ids: { type: "array", items: { type: "string" } }
+  }
+};
+
+// Phase 7 — relevance-based memory retrieval. When the workspace has more enabled
+// memories than the context budget, a lightweight model ranks the pool by relevance
+// to the current message and the top-N are used. Falls back to importance order.
+async function selectRelevantMemories(ctx, userMessage, pool, maxMemories) {
+  if (!pool || pool.length === 0) return [];
+  if (pool.length <= maxMemories) return pool;
+  try {
+    const inventory = pool.map(m => ({ id: m.id, content: m.content }));
+    const result = await callLLM(ctx, {
+      model: ctx.config.models.memory,
+      responseJsonSchema: MEMORY_RELEVANCE_SCHEMA,
+      messages: [
+        { role: "system", content: `You are a memory relevance agent. Given a user's message and a list of memories (with ids), return the ids of the memories most relevant to the message, in order of relevance, up to ${maxMemories}. Only include ids that genuinely relate to the message; if few are relevant, return fewer.` },
+        { role: "user", content: `Message: ${userMessage}\n\nMemories (JSON):\n${JSON.stringify(inventory)}` }
+      ]
+    });
+    if (result && Array.isArray(result.relevant_ids)) {
+      const idSet = new Set(inventory.map(m => m.id));
+      const seen = new Set();
+      const selected = [];
+      for (const id of result.relevant_ids) {
+        if (!idSet.has(id) || seen.has(id)) continue;
+        const m = pool.find(x => x.id === id);
+        if (m) { selected.push(m); seen.add(m.id); }
+        if (selected.length >= maxMemories) break;
+      }
+      // top up with highest-importance unused if the model returned fewer than the budget
+      for (const m of pool) {
+        if (seen.has(m.id)) continue;
+        selected.push(m); seen.add(m.id);
+        if (selected.length >= maxMemories) break;
+      }
+      return selected;
+    }
+  } catch (e) {
+    ctx.logger.warn("memory relevance selection failed, using importance fallback", { error: String(e) });
+  }
+  return pool.slice(0, maxMemories);
+}
+
 async function handle(req) {
   const base44 = createClientFromRequest(req);
   const user = await base44.auth.me();
@@ -64,11 +111,13 @@ async function handle(req) {
         ctx.config.orchestrator.maxHistoryMessages
       );
       const history = [...messages].reverse();
-      const memories = await ctx.base44.entities.Memory.filter(
+      const poolSize = ctx.config.orchestrator.memoryPoolSize || ctx.config.orchestrator.maxMemories;
+      const pool = await ctx.base44.entities.Memory.filter(
         { workspace_id: workspaceId, is_enabled: true },
         '-importance',
-        ctx.config.orchestrator.maxMemories
+        poolSize
       );
+      const memories = await selectRelevantMemories(ctx, userMessage, pool, ctx.config.orchestrator.maxMemories);
       const workspace = await ctx.base44.entities.Workspace.get(workspaceId);
       return { conversationId, workspaceId, userMessage, history, memories, workspace };
     }
@@ -264,6 +313,7 @@ async function handle(req) {
     modelUsed: currentResponse.modelUsed,
     latencyMs,
     council: {
+      memoriesUsed: (contextResult.memories || []).map(m => ({ id: m.id, preview: String(m.content || '').slice(0, 120) })),
       classification: observerResult.classification,
       plan: strategistResult.plan,
       taskContextId: strategistResult.taskContext?.id || null,

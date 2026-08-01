@@ -6,7 +6,8 @@ export function getSystemConfig() {
   return Object.freeze({
     orchestrator: {
       maxHistoryMessages: 20,
-      maxMemories: 10
+      maxMemories: 10,
+      memoryPoolSize: 20
     },
     models: {
       primary: "gpt_5_4",
