@@ -89,7 +89,7 @@ export default function CognosLayout() {
           </div>
         )}
 
-        <main className="flex-1 flex flex-col overflow-hidden pb-16 md:pb-0" style={{ paddingTop: 'env(safe-area-inset-top, 12px)' }}>
+        <main className="flex-1 flex flex-col overflow-hidden pb-[calc(env(safe-area-inset-bottom,12px)+56px)] md:pb-0" style={{ paddingTop: 'env(safe-area-inset-top, 12px)' }}>
           <Outlet />
         </main>
       </div>
