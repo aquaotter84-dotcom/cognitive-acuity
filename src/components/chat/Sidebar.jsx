@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Brain, Plus, Search, FolderKanban, Settings as SettingsIcon, Activity as ActivityIcon, Sparkles, Bot, FileText, Atom, History } from 'lucide-react';
+import { Brain, Plus, Search, FolderKanban, Settings as SettingsIcon, Activity as ActivityIcon, Sparkles, Bot, FileText, Atom, History, Network } from 'lucide-react';
 import { useCognos } from '@/lib/cognosContext';
 import { base44 } from '@/api/base44Client';
 import { Image } from '@/components/ui/image';
@@ -176,6 +176,9 @@ export default function Sidebar({ onNavigate }) {
         </Link>
         <Link to="/dynamics" className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-muted/50 text-sm transition-colors" onClick={onNavigate}>
           <History className="w-4 h-4 text-primary" /> Dynamics
+        </Link>
+        <Link to="/system" className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-muted/50 text-sm transition-colors" onClick={onNavigate}>
+          <Network className="w-4 h-4 text-accent" /> System
         </Link>
         <Link to="/agent" className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-muted/50 text-sm transition-colors" onClick={onNavigate}>
           <Bot className="w-4 h-4 text-accent" /> Agent

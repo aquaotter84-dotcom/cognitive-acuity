@@ -17,6 +17,7 @@ import Insights from '@/pages/Insights';
 import Documents from '@/pages/Documents';
 import Beliefs from '@/pages/Beliefs';
 import Dynamics from '@/pages/Dynamics';
+import SystemMap from '@/pages/SystemMap';
 import AgentChat from '@/pages/AgentChat';
 import About from '@/pages/About';
 import Contact from '@/pages/Contact';
@@ -61,6 +62,7 @@ const AuthenticatedApp = () => {
           <Route path="/documents" element={<Documents />} />
           <Route path="/beliefs" element={<Beliefs />} />
           <Route path="/dynamics" element={<Dynamics />} />
+          <Route path="/system" element={<SystemMap />} />
           <Route path="/agent" element={<AgentChat />} />
           <Route path="/workspaces" element={<Workspaces />} />
           <Route path="/settings" element={<Settings />} />
