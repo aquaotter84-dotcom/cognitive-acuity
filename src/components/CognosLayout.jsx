@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Outlet } from 'react-router-dom';
+import { Outlet, useLocation } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { CognosContext } from '@/lib/cognosContext';
 import Sidebar from '@/components/chat/Sidebar';
@@ -12,6 +12,13 @@ export default function CognosLayout() {
   const [activeConversationId, setActiveConversationId] = useState(null);
   const [isSidebarOpen, setSidebarOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const location = useLocation();
+
+  // Auto-close the mobile sidebar drawer on any navigation, so it never gets
+  // stuck open after tapping a menu item.
+  useEffect(() => {
+    setSidebarOpen(false);
+  }, [location.pathname, location.search]);
 
   useEffect(() => {
     (async () => {
