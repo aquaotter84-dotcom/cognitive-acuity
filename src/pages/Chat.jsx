@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Menu, Volume2, VolumeX, Phone, PhoneOff, Globe, Radio } from 'lucide-react';
+import { Menu, Volume2, VolumeX, Phone, PhoneOff, Globe } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { useSpeechSynthesis } from '@/hooks/useVoice';
 import { useConversationMode } from '@/hooks/useConversationMode';
@@ -9,7 +9,6 @@ import ChatMessage from '@/components/chat/ChatMessage';
 import ChatInput from '@/components/chat/ChatInput';
 import WelcomeScreen from '@/components/chat/WelcomeScreen';
 import ConversationOverlay from '@/components/chat/ConversationOverlay';
-import LiveVoice from '@/components/chat/LiveVoice';
 import { extractAttachmentContext } from '@/lib/documentAnalysis';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 
@@ -25,7 +24,6 @@ export default function Chat() {
   const [streaming, setStreaming] = useState(null);
   const [autoSpeak, setAutoSpeak] = useState(false);
   const [webSearch, setWebSearch] = useState(false);
-  const [liveVoice, setLiveVoice] = useState(null);
   const abortRef = useRef(false);
   const autoSpeakRef = useRef(false);
   const messagesEndRef = useRef(null);
@@ -162,25 +160,6 @@ export default function Chat() {
 
   useEffect(() => { handleSendRef.current = handleSend; });
 
-  const startLiveVoice = async () => {
-    if (!activeWorkspace) return;
-    let convId = conversationId;
-    if (!convId) {
-      const memberIds = activeWorkspace.member_ids?.length ? activeWorkspace.member_ids : [currentUser.id];
-      const c = await base44.entities.Conversation.create({
-        title: 'Live Voice',
-        workspace_id: activeWorkspace.id,
-        last_message_preview: '🎙️ Live voice session',
-        member_ids: memberIds
-      });
-      convId = c.id;
-      setActiveConversationId(convId);
-      setSearchParams({ c: convId });
-      refreshConversations();
-    }
-    setLiveVoice({ conversationId: convId });
-  };
-
   const handleStop = () => {
     abortRef.current = true;
     if (streaming && !streaming.done) {
@@ -242,13 +221,6 @@ export default function Chat() {
           {conv.active ? <PhoneOff className="w-4 h-4" /> : <Phone className="w-4 h-4" />}
         </button>
         <button
-          onClick={() => (liveVoice ? setLiveVoice(null) : startLiveVoice())}
-          className={`p-1.5 rounded-lg transition-colors ${liveVoice ? 'text-primary bg-primary/10' : 'text-muted-foreground hover:text-foreground'}`}
-          title={liveVoice ? 'End live voice' : 'Live voice'}
-        >
-          <Radio className="w-4 h-4" />
-        </button>
-        <button
           onClick={() => { const v = !autoSpeak; setAutoSpeak(v); if (!v) cancel(); }}
           className={`p-1.5 rounded-lg transition-colors ${autoSpeak ? 'text-primary bg-primary/10' : 'text-muted-foreground hover:text-foreground'}`}
           title={autoSpeak ? 'Auto-listen on' : 'Auto-listen off'}
@@ -306,14 +278,6 @@ export default function Chat() {
           interim={conv.interim}
           onInterrupt={conv.interrupt}
           onEnd={conv.deactivate}
-        />
-      )}
-      {liveVoice && (
-        <LiveVoice
-          workspaceId={activeWorkspace.id}
-          conversationId={liveVoice.conversationId}
-          style={style}
-          onEnd={() => setLiveVoice(null)}
         />
       )}
     </div>
