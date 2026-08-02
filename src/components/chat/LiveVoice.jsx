@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Room, RoomEvent, Track } from 'livekit-client';
 import { base44 } from '@/api/base44Client';
-import { PhoneOff, Mic, MicOff, Loader2, AlertCircle, Radio } from 'lucide-react';
+import { PhoneOff, Mic, MicOff, Loader2, Radio, WifiOff, KeyRound } from 'lucide-react';
 
 // Full-duplex live voice over LiveKit. The browser joins a LiveKit room (token
 // from createLiveVoiceToken), publishes mic audio, and plays the remote agent's
@@ -9,14 +9,21 @@ import { PhoneOff, Mic, MicOff, Loader2, AlertCircle, Radio } from 'lucide-react
 // seven-laws council (chatOrchestrate) -> TTS. This component only handles
 // audio I/O + the orb UI; reasoning stays server-side.
 
+// Three distinct failure states, so the orb can tell "the server is
+// unreachable" apart from "missing credentials" apart from "connected but the
+// agent hasn't joined yet":
+//   config_error  — token endpoint refused / secrets missing (fixable in-app)
+//   unreachable   — WebSocket can't reach LiveKit (wrong URL / project not live)
+//   waiting       — connected to LiveKit, waiting for the agent process to join
 const STATUS = {
   connecting: { label: 'Connecting to COGNOS…', tone: 'idle' },
-  waiting: { label: 'Waiting for the agent to join…', tone: 'idle' },
+  waiting: { label: 'Connected — waiting for the agent to join…', tone: 'idle' },
   listening: { label: 'Listening — speak naturally', tone: 'live' },
   speaking: { label: 'COGNOS is speaking…', tone: 'speak' },
   muted: { label: 'Mic muted', tone: 'muted' },
   reconnecting: { label: 'Reconnecting…', tone: 'idle' },
-  error: { label: 'Connection failed', tone: 'error' }
+  config_error: { label: 'LiveKit isn\'t configured', tone: 'error' },
+  unreachable: { label: 'Can\'t reach the LiveKit server', tone: 'error' }
 };
 
 export default function LiveVoice({ workspaceId, conversationId, style, onEnd }) {
@@ -24,6 +31,7 @@ export default function LiveVoice({ workspaceId, conversationId, style, onEnd })
   const [micOn, setMicOn] = useState(true);
   const [agentJoined, setAgentJoined] = useState(false);
   const [transcript, setTranscript] = useState('');
+  const [errorDetail, setErrorDetail] = useState('');
   const roomRef = useRef(null);
   const audioContainerRef = useRef(null);
 
@@ -32,6 +40,9 @@ export default function LiveVoice({ workspaceId, conversationId, style, onEnd })
     let room;
 
     (async () => {
+      let url, token;
+      // 1. Mint a LiveKit token. Failure here means the app's LiveKit
+      //    secrets aren't configured — surface that distinctly.
       try {
         const res = await base44.functions.invoke('createLiveVoiceToken', {
           workspaceId,
@@ -39,9 +50,19 @@ export default function LiveVoice({ workspaceId, conversationId, style, onEnd })
           style
         });
         if (disposed) return;
-        const { url, token } = res.data;
-        if (!url || !token) throw new Error('No token returned');
+        ({ url, token } = res.data || {});
+        if (!url || !token) throw new Error('Token endpoint returned no url/token');
+      } catch (e) {
+        console.error('LiveVoice token failed:', e);
+        if (disposed) return;
+        setErrorDetail(e?.message || String(e));
+        setStatus('config_error');
+        return;
+      }
 
+      // 2. Open the WebSocket to LiveKit. Failure here (serverUnreachable)
+      //    means the URL is wrong or the project isn't live/provisioned.
+      try {
         room = new Room({ adaptiveStream: true, dynacast: true });
         roomRef.current = room;
 
@@ -67,7 +88,7 @@ export default function LiveVoice({ workspaceId, conversationId, style, onEnd })
         room.on(RoomEvent.ActiveSpeakerChanged, (speakers) => {
           const agentSpeaking = speakers.some((s) => s.sid !== room.localParticipant.sid);
           setStatus((prev) =>
-            prev === 'error' ? prev : agentSpeaking ? 'speaking' : micOnRef.current ? 'listening' : 'muted'
+            (prev === 'config_error' || prev === 'unreachable') ? prev : agentSpeaking ? 'speaking' : micOnRef.current ? 'listening' : 'muted'
           );
         });
 
@@ -100,7 +121,14 @@ export default function LiveVoice({ workspaceId, conversationId, style, onEnd })
         }
       } catch (e) {
         console.error('LiveVoice connect failed:', e);
-        if (!disposed) setStatus('error');
+        if (disposed) return;
+        const msg = e?.message || String(e);
+        // Auth rejection (server reached but rejected the token) → config error,
+        // not a network problem. True unreachability = DNS/timeout/connection.
+        const authRejected = /invalid api key|unauthorized|401|forbidden|invalid token|signature/i.test(msg);
+        const unreachable = !authRejected && /unreachable|ECONN|network|timeout|resolve|WebSocket|signal connection|handshake/i.test(msg);
+        setErrorDetail(msg);
+        setStatus(authRejected ? 'config_error' : unreachable ? 'unreachable' : 'config_error');
       }
     })();
 
@@ -122,7 +150,7 @@ export default function LiveVoice({ workspaceId, conversationId, style, onEnd })
     try {
       await room.localParticipant.setMicrophoneEnabled(next);
       setMicOn(next);
-      if (status !== 'speaking' && status !== 'error') setStatus(next ? 'listening' : 'muted');
+      if (status !== 'speaking' && status !== 'config_error' && status !== 'unreachable') setStatus(next ? 'listening' : 'muted');
     } catch { /* permission denied again */ }
   };
 
@@ -134,7 +162,9 @@ export default function LiveVoice({ workspaceId, conversationId, style, onEnd })
   const meta = STATUS[status];
   const tone = meta.tone;
   const isSpeaking = status === 'speaking';
-  const isError = status === 'error';
+  const isError = status === 'config_error' || status === 'unreachable';
+  const isConfigError = status === 'config_error';
+  const isUnreachable = status === 'unreachable';
 
   const orbGradient =
     tone === 'speak' ? 'from-primary to-accent' :
@@ -172,7 +202,11 @@ export default function LiveVoice({ workspaceId, conversationId, style, onEnd })
           {status === 'connecting' || status === 'reconnecting' ? (
             <Loader2 className="w-12 h-12 text-white animate-spin" />
           ) : isError ? (
-            <AlertCircle className="w-12 h-12 text-white" />
+            isUnreachable ? (
+              <WifiOff className="w-12 h-12 text-white" />
+            ) : (
+              <KeyRound className="w-12 h-12 text-white" />
+            )
           ) : !micOn ? (
             <MicOff className="w-12 h-12 text-white" />
           ) : (
@@ -210,10 +244,17 @@ export default function LiveVoice({ workspaceId, conversationId, style, onEnd })
         </button>
       </div>
 
-      {isError && (
+      {isConfigError && (
         <p className="mt-6 text-xs text-muted-foreground max-w-sm text-center">
-          Check that your LiveKit credentials are set and that the Live Voice agent process is running, then try again.
+          LiveKit credentials aren't set up yet. Set <code className="text-foreground">LIVEKIT_URL</code>, <code className="text-foreground">LIVEKIT_API_KEY</code> and <code className="text-foreground">LIVEKIT_API_SECRET</code>, then reopen Live Voice.
+          {errorDetail && <span className="block mt-1 text-muted-foreground/70">Detail: {errorDetail}</span>}
         </p>
+      )}
+      {isUnreachable && (
+        <div className="mt-6 text-xs text-muted-foreground max-w-sm text-center space-y-1">
+          <p>The browser couldn't open a WebSocket to your LiveKit project. Check that the URL is correct and the project is active in your LiveKit Cloud dashboard.</p>
+          {errorDetail && <p className="text-muted-foreground/70">Detail: {errorDetail}</p>}
+        </div>
       )}
     </div>
   );
