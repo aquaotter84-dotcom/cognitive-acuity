@@ -6,13 +6,16 @@
 //   - State is temporary: the current derivation is one equilibrium; history is persisted.
 //   - Every change is reversible: a BeliefSnapshot chain lets the ledger replay itself.
 //
-// Relationship Dynamics Engine v1 (deterministic, no LLM):
+// Relationship Dynamics Engine v2 (deterministic cascade, no LLM):
 //   After the LLM emits falsifiable beliefs, a deterministic pass infers a tiny
 //   belief↔belief ontology (supports / contradicts / depends_on) from shared and
-//   conflicting evidence, then propagates each belief's confidence along those edges
-//   in a single pass. Every resulting adjustment and every relationship formed/broken
-//   is recorded as a ChangeEvent carrying structured cause_metadata — so the ledger
-//   alone can answer "why did this belief change?".
+//   conflicting evidence, then iteratively propagates each belief's confidence along
+//   those edges using the neighbours' LIVE (already-propagated) confidence — so a
+//   shift in one belief cascades through the graph to its neighbours, then to theirs.
+//   Bounded by max passes + clamping; converges for the tiny v1 ontology. Every
+//   resulting adjustment and every relationship formed/broken is recorded as a
+//   ChangeEvent carrying structured cause_metadata (with cascade_depth) — so the
+//   ledger alone can answer "why did this belief change, and what did it move?".
 
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.40';
 import { createLogger } from "../../shared/logging.ts";
@@ -121,33 +124,60 @@ function inferRelationships(beliefs) {
   return rels;
 }
 
-// Single deterministic pass. Uses each influencer's BASE confidence (not its
-// propagated value) so there are no cascades or convergence loops — v1 stays
-// simple, bounded, and fully deterministic.
-function propagate(beliefs, rels) {
+// Iterative deterministic cascade. Each pass recomputes every belief's confidence
+// from its BASE plus the sum of incoming edge contributions, where each contribution
+// uses the influencer's CURRENT (already-propagated) confidence — so influence
+// ripples through the graph across passes until it converges (or maxPasses). v1 used
+// a single pass with base confidence and no cascade; v2 makes "one belief
+// influencing another" genuinely transitive while staying bounded and deterministic.
+function propagate(beliefs, rels, maxPasses = 6, epsilon = 0.005) {
   const byKey = new Map(beliefs.map(b => [b.key, b]));
   for (const b of beliefs) { b.drivers = []; b.confidence = b.base; }
+  if (!rels.length) {
+    for (const b of beliefs) b.confidence = Number(Math.max(0.05, Math.min(0.99, b.base)).toFixed(3));
+    return { beliefs, passes: 0 };
+  }
+  let passes = 0;
+  while (passes < maxPasses) {
+    const next = new Map();
+    for (const b of beliefs) next.set(b.key, b.base);
+    for (const r of rels) {
+      const src = byKey.get(r.source);
+      const tgt = byKey.get(r.target);
+      if (!src || !tgt) continue;
+      const contrib = RELATIONSHIP_SIGN[r.type] * r.weight * (tgt.confidence ?? tgt.base) * PROPAGATION_FACTOR;
+      next.set(src.key, (next.get(src.key) ?? src.base) + contrib);
+    }
+    let maxDelta = 0;
+    for (const b of beliefs) {
+      const nv = Number(Math.max(0.05, Math.min(0.99, next.get(b.key) ?? b.base)).toFixed(3));
+      maxDelta = Math.max(maxDelta, Math.abs(nv - b.confidence));
+      b.confidence = nv;
+    }
+    passes++;
+    if (maxDelta < epsilon) break;
+  }
+  // Record direct (depth-1) drivers using each influencer's FINAL confidence, so
+  // the ledger explains the cascaded result. (Transitive depth is implicit in the
+  // iterated confidence; the driver list keeps the immediate cause legible.)
   for (const r of rels) {
     const src = byKey.get(r.source);
     const tgt = byKey.get(r.target);
     if (!src || !tgt) continue;
-    const contribution = RELATIONSHIP_SIGN[r.type] * r.weight * (tgt.base ?? 0) * PROPAGATION_FACTOR;
-    src.confidence = (src.confidence ?? src.base) + contribution;
+    const contribution = RELATIONSHIP_SIGN[r.type] * r.weight * (tgt.confidence ?? tgt.base) * PROPAGATION_FACTOR;
     src.drivers.push({
       subject_id: tgt.key,
       subject_label: tgt.claim,
       relationship: r.type,
       weight: r.weight,
-      related_confidence: tgt.base,
+      related_confidence: Number((tgt.confidence ?? tgt.base).toFixed(3)),
       contribution: Number(contribution.toFixed(4)),
+      cascade_depth: 1,
       via: r.via
     });
   }
-  for (const b of beliefs) {
-    b.drivers.sort((a, c) => Math.abs(c.contribution) - Math.abs(a.contribution));
-    b.confidence = Number(Math.max(0.05, Math.min(0.99, b.confidence)).toFixed(3));
-  }
-  return beliefs;
+  for (const b of beliefs) b.drivers.sort((a, c) => Math.abs(c.contribution) - Math.abs(a.contribution));
+  return { beliefs, passes };
 }
 
 function summarizeDrivers(drivers) {
@@ -341,9 +371,9 @@ Prefer a few well-supported beliefs over many speculative ones. If the evidence 
     contradicting: (b.contradicting_evidence || []).map(x => x.id).filter(Boolean)
   }));
 
-  // --- Relationship Dynamics Engine v1 (deterministic) ---
+  // --- Relationship Dynamics Engine v2 (deterministic cascade) ---
   const relationships = inferRelationships(beliefs);
-  propagate(beliefs, relationships);
+  const propagation = propagate(beliefs, relationships);
 
   // --- Transition detection across the ledger ---
   const currentManifest = evidence.map(m => ({
@@ -403,6 +433,7 @@ Prefer a few well-supported beliefs over many speculative ones. If the evidence 
 
   return Response.json({
     identity, beliefs, evidenceCount: evidence.length, derivedAt: new Date().toISOString(), runId: snapId,
+    propagation_passes: propagation.passes,
     relationships: { count: relationships.length, supports: relationships.filter(r => r.type === 'supports').length, contradicts: relationships.filter(r => r.type === 'contradicts').length, depends_on: relationships.filter(r => r.type === 'depends_on').length },
     transitions: {
       evidence: evTransitions.length, relationships: relTransitions.length,

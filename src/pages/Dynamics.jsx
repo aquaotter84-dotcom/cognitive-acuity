@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
-import { History, RefreshCw, Filter } from 'lucide-react';
+import { History, RefreshCw, Filter, GitBranch } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { useCognos } from '@/lib/cognosContext';
 import ChangeEventCard from '@/components/dynamics/ChangeEventCard';
 import BeliefHistory from '@/components/dynamics/BeliefHistory';
+import CascadeTimeline from '@/components/dynamics/CascadeTimeline';
 import MobilePageHeader from '@/components/MobilePageHeader';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 
@@ -27,6 +28,7 @@ export default function Dynamics() {
   const [loading, setLoading] = useState(false);
   const [filter, setFilter] = useState('all');
   const [trace, setTrace] = useState(null);
+  const [cascade, setCascade] = useState(false);
 
   const load = useCallback(async () => {
     if (!activeWorkspace) return;
@@ -86,6 +88,10 @@ export default function Dynamics() {
                   {FILTERS.map(f => <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>)}
                 </SelectContent>
               </Select>
+              <button onClick={() => setCascade(true)} disabled={!activeWorkspace} className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-accent/10 text-accent hover:bg-accent/20 transition-colors disabled:opacity-50">
+                <GitBranch className="w-3.5 h-3.5" />
+                <span className="text-xs font-medium">Cascade</span>
+              </button>
             </div>
             <div className="flex items-center gap-2 text-xs">
               <span className="px-2 py-0.5 rounded-full bg-primary/10 text-primary">Evidence {counts.memory || 0}</span>
@@ -116,6 +122,13 @@ export default function Dynamics() {
           beliefKey={trace.id}
           beliefLabel={trace.label}
           onClose={() => setTrace(null)}
+        />
+      )}
+
+      {cascade && activeWorkspace && (
+        <CascadeTimeline
+          workspaceId={activeWorkspace.id}
+          onClose={() => setCascade(false)}
         />
       )}
     </div>
