@@ -26,7 +26,9 @@ export default function CognosLayout() {
       try {
         const me = await base44.auth.me();
         setCurrentUser(me);
-        let workspaces = await base44.entities.Workspace.list();
+        let workspaces = (await base44.entities.Workspace.list()).filter(
+          w => (w.member_ids || []).includes(me.id) || w.created_by_id === me.id
+        );
         if (workspaces.length === 0) {
           const ws = await base44.entities.Workspace.create({
             name: 'Personal',

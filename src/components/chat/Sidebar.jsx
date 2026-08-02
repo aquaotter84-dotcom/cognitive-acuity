@@ -16,7 +16,9 @@ export default function Sidebar({ onNavigate }) {
   const [workspaces, setWorkspaces] = useState([]);
 
   useEffect(() => {
-    base44.entities.Workspace.list().then(setWorkspaces).catch(() => {});
+    base44.entities.Workspace.list()
+      .then(list => setWorkspaces(list.filter(w => (w.member_ids || []).includes(currentUser?.id) || w.created_by_id === currentUser?.id)))
+      .catch(() => {});
   }, [activeWorkspace]);
 
   const filtered = conversations.filter(c =>
