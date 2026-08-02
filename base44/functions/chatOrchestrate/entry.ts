@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.40';
+import { secrets } from 'base44:runtime';
 
 // Phase 1 nervous system
 import { createLogger } from "../../shared/logging.ts";
@@ -115,11 +116,22 @@ async function summarizeConversation(ctx, conversationId, history, userMessage, 
 }
 
 async function handle(req) {
-  const base44 = createClientFromRequest(req);
-  const user = await base44.auth.me();
-  if (!user) throw new CognosError("Unauthorized", { code: "AUTH", category: "auth", status: 401 });
-
   const body = await req.json();
+  const agentSecret = secrets.get('COGNOS_AGENT_SECRET');
+  const providedSecret = req.headers.get('X-Agent-Secret');
+  let base44;
+  let user;
+  if (agentSecret && providedSecret && providedSecret === agentSecret) {
+    // External Live Voice agent — runs the full council as service role, scoped
+    // to the userId carried in the payload (forwarded from the LiveKit token).
+    base44 = createClientFromRequest(req).asServiceRole;
+    user = { id: body.userId, role: 'admin', full_name: 'Live Voice Agent', email: null };
+    if (!user.id) throw new CognosError("Missing userId for agent invocation", { code: "VALIDATION", category: "input", status: 400 });
+  } else {
+    base44 = createClientFromRequest(req);
+    user = await base44.auth.me();
+    if (!user) throw new CognosError("Unauthorized", { code: "AUTH", category: "auth", status: 401 });
+  }
   const { conversationId, workspaceId, userMessage, style, attachments, webSearch } = body;
   if (!conversationId || !workspaceId || !userMessage) {
     throw new CognosError("Missing required fields", { code: "VALIDATION", category: "input", status: 400 });
