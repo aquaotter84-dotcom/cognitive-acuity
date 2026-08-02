@@ -24,10 +24,12 @@ from livekit.agents import (
     JobContext,
     WorkerOptions,
     AutoSubscribe,
+    TurnHandlingOptions,
     cli,
     llm,
 )
 from livekit.plugins import deepgram, openai, silero
+from livekit.plugins.turn_detector.multilingual import MultilingualModel
 
 COGNOS_CHAT_URL = os.getenv("COGNOS_CHAT_URL", "")
 AGENT_SECRET = os.getenv("COGNOS_AGENT_SECRET", "")
@@ -114,7 +116,7 @@ async def entrypoint(ctx: JobContext):
                 pass
 
     session = AgentSession(
-        vad=silero.VAD(),
+        vad=silero.VAD.load(),
         stt=deepgram.STT(model="nova-3"),
         llm=CognosLLM(
             room=room,
@@ -124,6 +126,12 @@ async def entrypoint(ctx: JobContext):
             user_id=meta.get("userId"),
         ),
         tts=openai.TTS(voice="alloy"),
+        # Use LiveKit's multilingual end-of-turn detector instead of the
+        # model's built-in one — better for natural conversation flow. The
+        # council (CognosLLM -> chatOrchestrate) stays the brain.
+        turn_handling=TurnHandlingOptions(
+            turn_detection=MultilingualModel(),
+        ),
     )
 
     await session.start(
