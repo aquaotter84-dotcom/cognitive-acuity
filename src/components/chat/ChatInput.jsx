@@ -76,40 +76,46 @@ export default function ChatInput({ onSend, disabled, isProcessing, onStop }) {
           ))}
         </div>
       )}
-      <div className="max-w-3xl mx-auto flex items-end gap-2 bg-card border border-border rounded-2xl p-2 focus-within:border-primary/50 transition-colors">
+      <div className="max-w-3xl mx-auto bg-card border border-border rounded-2xl p-2 focus-within:border-primary/50 transition-colors">
         <input ref={fileInputRef} type="file" multiple className="hidden" onChange={(e) => { handleFiles(e.target.files); e.target.value = ''; }} />
-        <button onClick={() => fileInputRef.current?.click()} disabled={uploading} className="p-2 text-muted-foreground hover:text-foreground disabled:opacity-50 transition-colors" title="Attach files or images">
-          {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Paperclip className="w-4 h-4" />}
-        </button>
-        <button onClick={() => setVision('screen')} className="p-2 text-muted-foreground hover:text-foreground transition-colors" title="Share screen">
-          <Monitor className="w-4 h-4" />
-        </button>
-        <button onClick={() => setVision('camera')} className="p-2 text-muted-foreground hover:text-foreground transition-colors" title="Live camera">
-          <Camera className="w-4 h-4" />
-        </button>
-        {micSupported && (
-          <button onClick={() => (listening ? stop() : start())} className={`p-2 rounded-xl transition-colors ${listening ? 'bg-destructive text-destructive-foreground animate-pulse' : 'text-muted-foreground hover:text-foreground'}`} title={listening ? 'Stop listening' : 'Speak'}>
-            {listening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
-          </button>
-        )}
-        <textarea
-          ref={textareaRef}
-          value={displayText}
-          onChange={(e) => setText(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder="Message COGNOS..."
-          rows={1}
-          className="flex-1 bg-transparent resize-none outline-none text-sm py-2 placeholder:text-muted-foreground/60 scrollbar-thin"
-        />
-        {isProcessing ? (
-          <button onClick={onStop} className="p-2 rounded-xl bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors" title="Stop">
-            <Square className="w-4 h-4" />
-          </button>
-        ) : (
-          <button onClick={handleSend} disabled={disabled || (!text.trim() && !attachments.length)} className="p-2 rounded-xl bg-primary text-primary-foreground disabled:opacity-30 disabled:cursor-not-allowed hover:bg-primary/90 transition-colors">
-            <Send className="w-4 h-4" />
-          </button>
-        )}
+        <div className="flex flex-col md:flex-row md:items-end gap-2">
+          <div className="flex items-center gap-1 md:gap-1">
+            <button onClick={() => fileInputRef.current?.click()} disabled={uploading} className="p-2 text-muted-foreground hover:text-foreground disabled:opacity-50 transition-colors" title="Attach files or images">
+              {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Paperclip className="w-4 h-4" />}
+            </button>
+            <button onClick={() => setVision('screen')} className="p-2 text-muted-foreground hover:text-foreground transition-colors" title="Share screen">
+              <Monitor className="w-4 h-4" />
+            </button>
+            <button onClick={() => setVision('camera')} className="p-2 text-muted-foreground hover:text-foreground transition-colors" title="Live camera">
+              <Camera className="w-4 h-4" />
+            </button>
+            {micSupported && (
+              <button onClick={() => (listening ? stop() : start())} className={`p-2 rounded-xl transition-colors ${listening ? 'bg-destructive text-destructive-foreground animate-pulse' : 'text-muted-foreground hover:text-foreground'}`} title={listening ? 'Stop listening' : 'Speak'}>
+                {listening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+              </button>
+            )}
+          </div>
+          <div className="flex items-end gap-2 flex-1">
+            <textarea
+              ref={textareaRef}
+              value={displayText}
+              onChange={(e) => setText(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="Message COGNOS..."
+              rows={1}
+              className="flex-1 bg-transparent resize-none outline-none text-sm py-2 placeholder:text-muted-foreground/60 scrollbar-thin"
+            />
+            {isProcessing ? (
+              <button onClick={onStop} className="p-2 rounded-xl bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors" title="Stop">
+                <Square className="w-4 h-4" />
+              </button>
+            ) : (
+              <button onClick={handleSend} disabled={disabled || (!text.trim() && !attachments.length)} className="p-2 rounded-xl bg-primary text-primary-foreground disabled:opacity-30 disabled:cursor-not-allowed hover:bg-primary/90 transition-colors">
+                <Send className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+        </div>
       </div>
       {vision && (
         <VisionCapture mode={vision} onClose={() => setVision(null)} onAttach={(a) => { addAttachment(a); setVision(null); }} />
