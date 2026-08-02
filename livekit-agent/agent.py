@@ -16,6 +16,7 @@
 # here.
 
 import os
+import sys
 import json
 import httpx
 from livekit.agents import (
@@ -146,5 +147,32 @@ async def entrypoint(ctx: JobContext):
     )
 
 
+def _preflight():
+    """Fail fast with a clear message if any required env var is missing or
+    obviously wrong, so 'it's not connecting' is diagnosable instead of a
+    silent hang."""
+    required = {
+        "LIVEKIT_URL": os.getenv("LIVEKIT_URL", ""),
+        "LIVEKIT_API_KEY": os.getenv("LIVEKIT_API_KEY", ""),
+        "LIVEKIT_API_SECRET": os.getenv("LIVEKIT_API_SECRET", ""),
+        "COGNOS_CHAT_URL": COGNOS_CHAT_URL,
+        "COGNOS_AGENT_SECRET": AGENT_SECRET,
+        "DEEPGRAM_API_KEY": os.getenv("DEEPGRAM_API_KEY", ""),
+        "OPENAI_API_KEY": os.getenv("OPENAI_API_KEY", ""),
+    }
+    missing = [k for k, v in required.items() if not v]
+    url = required["LIVEKIT_URL"]
+    if url and not url.startswith("wss://") and not url.startswith("ws://"):
+        print(f"[COGNOS] LIVEKIT_URL must start with wss:// (got: {url!r})", file=sys.stderr)
+        missing.append("LIVEKIT_URL (needs wss://)")
+    if missing:
+        print("[COGNOS] Live Voice agent cannot start — missing/invalid env vars:", file=sys.stderr)
+        for k in missing:
+            print(f"  - {k}", file=sys.stderr)
+        print("Fill livekit-agent/.env (see .env.example) and retry.", file=sys.stderr)
+        sys.exit(1)
+
+
 if __name__ == "__main__":
+    _preflight()
     cli.run_app(WorkerOptions(entrypoint_func=entrypoint))
