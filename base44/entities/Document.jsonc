@@ -1,0 +1,131 @@
+{
+  "name": "Document",
+  "type": "object",
+  "properties": {
+    "workspace_id": {
+      "type": "string",
+      "description": "Reference to the workspace this document belongs to"
+    },
+    "name": {
+      "type": "string",
+      "description": "File or input name"
+    },
+    "source": {
+      "type": "string",
+      "enum": [
+        "upload",
+        "drive",
+        "camera",
+        "screen",
+        "audio"
+      ],
+      "description": "How this document entered COGNOS"
+    },
+    "file_url": {
+      "type": "string",
+      "description": "Base44 storage URL for the uploaded/imported file (uploads, camera, screen, Drive binary imports). Empty for Google Workspace docs whose text is exported directly."
+    },
+    "drive_file_id": {
+      "type": "string",
+      "description": "Google Drive file id, when source is 'drive'"
+    },
+    "mime_type": {
+      "type": "string",
+      "description": "Original MIME type of the file"
+    },
+    "file_type": {
+      "type": "string",
+      "enum": [
+        "document",
+        "spreadsheet",
+        "image",
+        "audio",
+        "video",
+        "other"
+      ],
+      "description": "Coarse category used to pick the analysis pipeline"
+    },
+    "extracted_content": {
+      "type": "string",
+      "description": "Text extracted from the file (document text, spreadsheet rows, image description, audio transcript)"
+    },
+    "analysis": {
+      "type": "string",
+      "description": "AI-generated analysis / summary of the extracted content"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "processing",
+        "complete",
+        "error"
+      ],
+      "description": "Processing status",
+      "default": "pending"
+    },
+    "error_message": {
+      "type": "string",
+      "description": "Error details if status is error"
+    },
+    "size": {
+      "type": "integer",
+      "description": "File size in bytes",
+      "default": 0
+    },
+    "member_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "User ids who can see this document (copied from the workspace at creation). RLS enforces member visibility.",
+      "default": []
+    }
+  },
+  "required": [
+    "workspace_id",
+    "name",
+    "source"
+  ],
+  "rls": {
+    "read": {
+      "$or": [
+        {
+          "created_by_id": "{{user.id}}"
+        },
+        {
+          "data.member_ids": "{{user.id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "update": {
+      "$or": [
+        {
+          "created_by_id": "{{user.id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "delete": {
+      "$or": [
+        {
+          "created_by_id": "{{user.id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    }
+  }
+}
