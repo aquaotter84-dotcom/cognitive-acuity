@@ -80,6 +80,15 @@ export default function Sidebar({ onNavigate }) {
     }
   };
 
+  const handleRename = async (id, newTitle) => {
+    try {
+      await base44.entities.Conversation.update(id, { title: newTitle });
+      await refreshConversations();
+    } catch (e) {
+      console.error('Failed to rename conversation:', e);
+    }
+  };
+
   return (
     <div className="flex flex-col h-full">
       <div className="px-4 py-4 flex items-center">
@@ -143,6 +152,7 @@ export default function Sidebar({ onNavigate }) {
               onSelect={handleSelect}
               onBranch={handleBranch}
               onDelete={handleDelete}
+              onRename={handleRename}
             />
           ))
         )}
