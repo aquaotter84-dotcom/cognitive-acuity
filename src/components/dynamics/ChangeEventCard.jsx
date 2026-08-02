@@ -1,0 +1,72 @@
+import { FileText, Atom, User, ArrowRight } from 'lucide-react';
+import moment from 'moment';
+
+// One row in the Phase 14 Event Ledger. Renders a transition: what changed,
+// from→to, the numeric delta, the cause, and the lineage run. Color is by
+// subject kind so the timeline reads as evidence / belief / identity bands.
+
+const GROUP = {
+  memory: { Icon: FileText, color: 'text-primary', dot: 'bg-primary', chip: 'bg-primary/10 text-primary' },
+  belief: { Icon: Atom, color: 'text-accent', dot: 'bg-accent', chip: 'bg-accent/10 text-accent' },
+  identity: { Icon: User, color: 'text-emerald-400', dot: 'bg-emerald-400', chip: 'bg-emerald-400/10 text-emerald-400' }
+};
+
+const VERB = {
+  evidence_added: 'Evidence added',
+  evidence_removed: 'Evidence removed',
+  evidence_reweighted: 'Evidence reweighted',
+  belief_emerged: 'Belief emerged',
+  belief_revised: 'Belief revised',
+  belief_collapsed: 'Belief collapsed',
+  identity_established: 'Identity established',
+  identity_revised: 'Identity revised'
+};
+
+function fmtState(state) {
+  if (!state) return '—';
+  if (typeof state.confidence === 'number') return `${(state.confidence * 100).toFixed(0)}%`;
+  if (typeof state.importance === 'number') return `imp ${state.importance}${state.evidence_level ? ' · ' + state.evidence_level : ''}`;
+  if (state.identity) return 'identity';
+  return '·';
+}
+
+export default function ChangeEventCard({ event }) {
+  const g = GROUP[event.subject_type] || GROUP.memory;
+  const Icon = g.Icon;
+  const delta = typeof event.delta === 'number' ? event.delta : 0;
+  const deltaStr = delta > 0 ? `+${delta.toFixed(delta % 1 ? 2 : 0)}` : delta < 0 ? `${delta.toFixed(delta % 1 ? 2 : 0)}` : '';
+  const emerged = !event.from_state;
+  const collapsed = !event.to_state;
+
+  return (
+    <div className="rounded-xl border border-border bg-card/40 px-3 py-3 hover:bg-card/60 transition-colors">
+      <div className="flex items-start gap-3">
+        <div className={`mt-0.5 flex-shrink-0 w-7 h-7 rounded-lg ${g.chip} flex items-center justify-center`}>
+          <Icon className="w-3.5 h-3.5" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center justify-between gap-2">
+            <span className={`text-xs font-medium ${g.color}`}>{VERB[event.event_type] || event.event_type}</span>
+            <span className="text-[10px] text-muted-foreground/70 flex-shrink-0">{moment(event.created_date).fromNow()}</span>
+          </div>
+          {event.subject_label && event.subject_type !== 'identity' && (
+            <p className="text-sm text-foreground/90 mt-1 line-clamp-2 selectable">{event.subject_label}</p>
+          )}
+          <div className="flex items-center gap-2 mt-1.5 text-[11px] text-muted-foreground">
+            <span className={emerged ? 'text-muted-foreground/50' : ''}>{fmtState(event.from_state)}</span>
+            <ArrowRight className="w-3 h-3 flex-shrink-0" />
+            <span className={collapsed ? 'text-destructive' : 'text-foreground/80'}>{fmtState(event.to_state)}</span>
+            {deltaStr && (
+              <span className={`ml-1 font-medium ${delta > 0 ? 'text-emerald-400' : delta < 0 ? 'text-destructive' : 'text-muted-foreground'}`}>
+                {deltaStr}
+              </span>
+            )}
+          </div>
+          {event.cause && (
+            <p className="text-[10px] text-muted-foreground/60 mt-1 italic">{event.cause}</p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}

@@ -1,0 +1,119 @@
+{
+  "name": "ChangeEvent",
+  "type": "object",
+  "properties": {
+    "workspace_id": {
+      "type": "string",
+      "description": "Workspace this transition belongs to"
+    },
+    "member_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "description": "Workspace members at emission time; RLS enforces member reads."
+    },
+    "run_id": {
+      "type": "string",
+      "description": "The BeliefSnapshot id that produced this transition. Groups events from one derivation run and gives temporal lineage via the snapshot chain (Phase 14 Principle 6)."
+    },
+    "event_type": {
+      "type": "string",
+      "enum": [
+        "evidence_added",
+        "evidence_removed",
+        "evidence_reweighted",
+        "belief_emerged",
+        "belief_revised",
+        "belief_collapsed",
+        "identity_established",
+        "identity_revised"
+      ],
+      "description": "The kind of state transition recorded. Change is the primary object; the ledger never stores conclusions, only transitions."
+    },
+    "subject_type": {
+      "type": "string",
+      "enum": [
+        "memory",
+        "belief",
+        "identity"
+      ],
+      "description": "What kind of subject changed."
+    },
+    "subject_id": {
+      "type": "string",
+      "description": "Stable id of the subject: memory id, normalized belief key, or 'identity'."
+    },
+    "subject_label": {
+      "type": "string",
+      "description": "Human-readable label: the belief claim, a memory content preview, or 'Identity'."
+    },
+    "from_state": {
+      "type": "object",
+      "description": "Prior state snapshot. Null on emergence.",
+      "properties": {}
+    },
+    "to_state": {
+      "type": "object",
+      "description": "New state snapshot. Null on collapse.",
+      "properties": {}
+    },
+    "delta": {
+      "type": "number",
+      "description": "Numeric change where meaningful: confidence delta for beliefs, +/-1 for evidence add/remove, importance delta for reweight.",
+      "default": 0
+    },
+    "cause": {
+      "type": "string",
+      "description": "Why this transition was recorded \u2014 e.g. 're-derivation', 'new evidence'."
+    }
+  },
+  "required": [
+    "workspace_id",
+    "event_type",
+    "subject_type",
+    "subject_id"
+  ],
+  "rls": {
+    "read": {
+      "$or": [
+        {
+          "created_by_id": "{{user.id}}"
+        },
+        {
+          "data.member_ids": "{{user.id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "update": {
+      "$or": [
+        {
+          "created_by_id": "{{user.id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "delete": {
+      "$or": [
+        {
+          "created_by_id": "{{user.id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    }
+  }
+}

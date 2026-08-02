@@ -1,0 +1,151 @@
+{
+  "name": "BeliefSnapshot",
+  "type": "object",
+  "properties": {
+    "workspace_id": {
+      "type": "string",
+      "description": "Workspace this derivation snapshot belongs to."
+    },
+    "member_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "description": "Workspace members at derivation time; RLS enforces member reads."
+    },
+    "prior_snapshot_id": {
+      "type": "string",
+      "description": "The previous BeliefSnapshot id. The lineage chain makes history replayable \u2014 every change is reversible and reconstructable (Phase 14 Principle 6)."
+    },
+    "identity": {
+      "type": "string",
+      "description": "Synthesized identity statement at this derivation."
+    },
+    "beliefs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "claim": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string"
+          },
+          "confidence": {
+            "type": "number"
+          },
+          "supporting_evidence": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "quote": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "contradicting_evidence": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "quote": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "rationale": {
+            "type": "string"
+          },
+          "last_challenged": {
+            "type": "string"
+          }
+        }
+      },
+      "description": "The full derived belief set at this point in time. This is history, not asserted truth \u2014 current beliefs are always re-derived on demand (Phase 13). The snapshot exists so Phase 14 can diff across time."
+    },
+    "evidence_manifest": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "importance": {
+            "type": "integer"
+          },
+          "evidence_level": {
+            "type": "string"
+          },
+          "content_preview": {
+            "type": "string"
+          }
+        }
+      },
+      "description": "The enabled-memory evidence base this snapshot was derived from. Used to detect evidence transitions (added/removed/reweighted) on the next run."
+    },
+    "evidence_count": {
+      "type": "integer",
+      "default": 0
+    },
+    "derived_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "workspace_id"
+  ],
+  "rls": {
+    "read": {
+      "$or": [
+        {
+          "created_by_id": "{{user.id}}"
+        },
+        {
+          "data.member_ids": "{{user.id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "update": {
+      "$or": [
+        {
+          "created_by_id": "{{user.id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "delete": {
+      "$or": [
+        {
+          "created_by_id": "{{user.id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    }
+  }
+}
