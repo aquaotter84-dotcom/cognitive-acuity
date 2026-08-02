@@ -3,6 +3,7 @@ import { History, RefreshCw, Filter } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { useCognos } from '@/lib/cognosContext';
 import ChangeEventCard from '@/components/dynamics/ChangeEventCard';
+import BeliefHistory from '@/components/dynamics/BeliefHistory';
 import MobilePageHeader from '@/components/MobilePageHeader';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 
@@ -25,6 +26,7 @@ export default function Dynamics() {
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(false);
   const [filter, setFilter] = useState('all');
+  const [trace, setTrace] = useState(null);
 
   const load = useCallback(async () => {
     if (!activeWorkspace) return;
@@ -102,11 +104,20 @@ export default function Dynamics() {
             </div>
           ) : (
             <div className="space-y-2">
-              {events.map(e => <ChangeEventCard key={e.id} event={e} />)}
+              {events.map(e => <ChangeEventCard key={e.id} event={e} onTrace={(id, label) => setTrace({ id, label })} />)}
             </div>
           )}
         </div>
       </div>
+
+      {trace && activeWorkspace && (
+        <BeliefHistory
+          workspaceId={activeWorkspace.id}
+          beliefKey={trace.id}
+          beliefLabel={trace.label}
+          onClose={() => setTrace(null)}
+        />
+      )}
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { FileText, Atom, User, Share2, ArrowRight } from 'lucide-react';
+import { FileText, Atom, User, Share2, ArrowRight, History } from 'lucide-react';
 import moment from 'moment';
 
 // One row in the Phase 14 Event Ledger. Renders a transition: what changed,
@@ -36,7 +36,7 @@ function fmtState(state) {
   return '·';
 }
 
-export default function ChangeEventCard({ event }) {
+export default function ChangeEventCard({ event, onTrace }) {
   const g = GROUP[event.subject_type] || GROUP.memory;
   const Icon = g.Icon;
   const delta = typeof event.delta === 'number' ? event.delta : 0;
@@ -99,6 +99,15 @@ export default function ChangeEventCard({ event }) {
 
           {event.cause && !hasMeta && (
             <p className="text-[10px] text-muted-foreground/60 mt-1 italic">{event.cause}</p>
+          )}
+
+          {event.subject_type === 'belief' && onTrace && (
+            <button
+              onClick={() => onTrace(event.subject_id, event.subject_label)}
+              className="mt-2 text-[10px] text-accent/80 hover:text-accent flex items-center gap-1 transition-colors"
+            >
+              <History className="w-3 h-3" /> Trace confidence history
+            </button>
           )}
         </div>
       </div>
