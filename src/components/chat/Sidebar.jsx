@@ -145,28 +145,28 @@ export default function Sidebar({ onNavigate }) {
       </div>
 
       <div className="border-t border-border p-2 space-y-0.5">
-        <Link to="/memory" className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-muted/50 text-sm transition-colors">
+        <Link to="/memory" className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-muted/50 text-sm transition-colors" onClick={onNavigate}>
           <Brain className="w-4 h-4 text-accent" /> Memory
         </Link>
-        <Link to="/activity" className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-muted/50 text-sm transition-colors">
+        <Link to="/activity" className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-muted/50 text-sm transition-colors" onClick={onNavigate}>
           <ActivityIcon className="w-4 h-4 text-primary" /> Activity
         </Link>
-        <Link to="/insights" className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-muted/50 text-sm transition-colors">
+        <Link to="/insights" className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-muted/50 text-sm transition-colors" onClick={onNavigate}>
           <Sparkles className="w-4 h-4 text-primary" /> Insights
         </Link>
-        <Link to="/documents" className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-muted/50 text-sm transition-colors">
+        <Link to="/documents" className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-muted/50 text-sm transition-colors" onClick={onNavigate}>
           <FileText className="w-4 h-4 text-primary" /> Documents
         </Link>
-        <Link to="/beliefs" className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-muted/50 text-sm transition-colors">
+        <Link to="/beliefs" className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-muted/50 text-sm transition-colors" onClick={onNavigate}>
           <Atom className="w-4 h-4 text-accent" /> Beliefs
         </Link>
-        <Link to="/agent" className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-muted/50 text-sm transition-colors">
+        <Link to="/agent" className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-muted/50 text-sm transition-colors" onClick={onNavigate}>
           <Bot className="w-4 h-4 text-accent" /> Agent
         </Link>
-        <Link to="/workspaces" className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-muted/50 text-sm transition-colors">
+        <Link to="/workspaces" className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-muted/50 text-sm transition-colors" onClick={onNavigate}>
           <FolderKanban className="w-4 h-4" /> Workspaces
         </Link>
-        <Link to="/settings" className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-muted/50 text-sm transition-colors">
+        <Link to="/settings" className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-muted/50 text-sm transition-colors" onClick={onNavigate}>
           <SettingsIcon className="w-4 h-4" /> Settings
         </Link>
       </div>
