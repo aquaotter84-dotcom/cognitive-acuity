@@ -293,7 +293,13 @@ async function handle(req) {
     type: "council.critique", from: "orchestrator", content: currentResponse
   }), ctx);
 
-  const maxRevisions = ctx.config.council.maxRevisions || 0;
+  // Phase 13 — Law 4 (adaptive reasoning) & economic intelligence: the problem
+  // determines the reasoning. Simple requests skip the costly critic revision loop;
+  // only moderate/complex tasks warrant it. The Strategist already passes through
+  // (plan: "direct") when the Observer flags no decomposition needed, so the simple
+  // path collapses to observer → specialist → synthesizer → governor.
+  const isSimple = observerResult.classification?.complexity === 'simple';
+  const maxRevisions = isSimple ? 0 : (ctx.config.council.maxRevisions || 0);
   const revisionScoreThreshold = ctx.config.council.revisionScoreThreshold || 0;
   let revisionCount = 0;
   let revisionTriggered = false;
@@ -382,6 +388,7 @@ async function handle(req) {
       subTasks: specialistResult.subTaskOutputs || null,
       critic: criticResult.evaluation,
       revisions: { count: revisionCount, triggered: revisionTriggered, maxRevisions },
+      adaptive: { complexity: observerResult.classification?.complexity, path: isSimple ? 'direct' : 'full' },
       governor: { approved: governorResult.approved, flags: governorResult.flags },
       stageTimings: ctx.timings || {}
     }

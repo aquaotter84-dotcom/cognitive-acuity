@@ -15,6 +15,7 @@ import Settings from '@/pages/Settings';
 import Activity from '@/pages/Activity';
 import Insights from '@/pages/Insights';
 import Documents from '@/pages/Documents';
+import Beliefs from '@/pages/Beliefs';
 import AgentChat from '@/pages/AgentChat';
 import About from '@/pages/About';
 import Contact from '@/pages/Contact';
@@ -56,6 +57,7 @@ const AuthenticatedApp = () => {
           <Route path="/memory" element={<Memory />} />
           <Route path="/insights" element={<Insights />} />
           <Route path="/documents" element={<Documents />} />
+          <Route path="/beliefs" element={<Beliefs />} />
           <Route path="/agent" element={<AgentChat />} />
           <Route path="/workspaces" element={<Workspaces />} />
           <Route path="/settings" element={<Settings />} />
