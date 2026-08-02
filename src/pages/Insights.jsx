@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { useCognos } from '@/lib/cognosContext';
 import ReactMarkdown from 'react-markdown';
+import PullToRefresh from '@/components/PullToRefresh';
 
 const TRIGGER_STYLES = {
   scheduled: 'bg-primary/10 text-primary',
@@ -60,7 +61,7 @@ export default function Insights() {
 
   return (
     <div className="flex flex-col h-full">
-      <header className="flex items-center gap-3 px-4 py-3 border-b border-border select-none">
+      <header className="flex items-center gap-3 px-4 py-3 border-b border-border select-none" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 0.75rem)' }}>
         <button onClick={() => navigate('/')} className="md:hidden p-2 -ml-2 rounded-lg hover:bg-muted transition-colors" aria-label="Back to chat">
           <ArrowLeft className="w-5 h-5" />
         </button>
@@ -92,7 +93,7 @@ export default function Insights() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto scrollbar-thin">
+      <PullToRefresh onRefresh={load} className="flex-1">
         <div className="max-w-3xl mx-auto px-4 py-6 space-y-3">
           {insights.length === 0 && !loading ? (
             <div className="text-center py-16 text-muted-foreground">
@@ -146,7 +147,7 @@ export default function Insights() {
             </div>
           ))}
         </div>
-      </div>
+      </PullToRefresh>
     </div>
   );
 }

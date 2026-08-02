@@ -10,6 +10,7 @@ export default function Settings() {
   const [user, setUser] = useState(null);
   const [memoryCount, setMemoryCount] = useState(0);
   const [conversationCount, setConversationCount] = useState(0);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     base44.auth.me().then(setUser).catch(() => {});
@@ -28,6 +29,17 @@ export default function Settings() {
 
   const handleLogout = () => {
     base44.auth.logout('/login');
+  };
+
+  const handleDeleteAccount = async () => {
+    setDeleting(true);
+    try {
+      await base44.functions.invoke('deleteAccount', {});
+    } catch (e) {
+      console.error('Account deletion failed:', e);
+    } finally {
+      base44.auth.logout('/login');
+    }
   };
 
   if (!user) {
@@ -115,8 +127,8 @@ export default function Settings() {
               </AlertDialogHeader>
               <AlertDialogFooter>
                 <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction onClick={handleLogout} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                  Delete &amp; Sign Out
+                <AlertDialogAction onClick={handleDeleteAccount} disabled={deleting} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                  {deleting ? 'Deleting…' : 'Delete &amp; Sign Out'}
                 </AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>

@@ -5,6 +5,8 @@ import { base44 } from '@/api/base44Client';
 import { useCognos } from '@/lib/cognosContext';
 import ShareMemoryModal from '@/components/memory/ShareMemoryModal';
 import MobilePageHeader from '@/components/MobilePageHeader';
+import PullToRefresh from '@/components/PullToRefresh';
+import MemoryFieldDrawer from '@/components/memory/MemoryFieldDrawer';
 
 const typeColors = {
   episodic: 'bg-accent/15 text-accent',
@@ -62,21 +64,24 @@ export default function Memory() {
   );
 
   const handleToggle = async (mem) => {
+    const next = !mem.is_enabled;
+    // Optimistic: flip locally first, persist in the background, revert on error.
+    setMemories(prev => prev.map(m => m.id === mem.id ? { ...m, is_enabled: next } : m));
     try {
-      await base44.entities.Memory.update(mem.id, { is_enabled: !mem.is_enabled });
-      loadMemories();
+      await base44.entities.Memory.update(mem.id, { is_enabled: next });
     } catch (e) {
-      console.error('Failed to toggle memory:', e);
+      setMemories(prev => prev.map(m => m.id === mem.id ? { ...m, is_enabled: mem.is_enabled } : m));
       setEditError(e?.message || 'Failed to update. Please try again.');
     }
   };
 
   const handleDelete = async (id) => {
+    const snapshot = memories;
+    setMemories(prev => prev.filter(m => m.id !== id));
     try {
       await base44.entities.Memory.delete(id);
-      loadMemories();
     } catch (e) {
-      console.error('Failed to delete memory:', e);
+      setMemories(snapshot);
       setEditError(e?.message || 'Failed to delete. Please try again.');
     }
   };
@@ -85,18 +90,19 @@ export default function Memory() {
     if (!editContent.trim()) return;
     setSavingId(id);
     setEditError(null);
+    const patch = {
+      content: editContent.trim(),
+      evidence_level: editEvidence,
+      volatility: editVolatility,
+      importance: Number(editImportance),
+      last_confirmed: new Date().toISOString()
+    };
+    setMemories(prev => prev.map(m => m.id === id ? { ...m, ...patch } : m));
+    setEditingId(null);
     try {
-      await base44.entities.Memory.update(id, {
-        content: editContent.trim(),
-        evidence_level: editEvidence,
-        volatility: editVolatility,
-        importance: Number(editImportance),
-        last_confirmed: new Date().toISOString()
-      });
-      setEditingId(null);
-      loadMemories();
+      await base44.entities.Memory.update(id, patch);
     } catch (e) {
-      console.error('Failed to save memory:', e);
+      loadMemories();
       setEditError(e?.message || 'Failed to save. Please try again.');
     } finally {
       setSavingId(null);
@@ -135,7 +141,7 @@ export default function Memory() {
   };
 
   return (
-    <div className="flex flex-col h-full overflow-y-auto scrollbar-thin">
+    <PullToRefresh onRefresh={loadMemories} className="flex flex-col h-full">
       <MobilePageHeader title="Memory" />
       <div className="max-w-3xl mx-auto w-full px-4 py-8 pb-24 md:pb-8">
         <div className="flex items-center gap-2 mb-2">
@@ -198,20 +204,27 @@ export default function Memory() {
                       autoFocus
                     />
                     <div className="flex gap-2 mt-2">
-                      <select value={editEvidence} onChange={(e) => setEditEvidence(e.target.value)} className="bg-background border border-border rounded-lg px-2 py-1 text-xs focus:outline-none focus:border-accent/50">
-                        <option value="direct">direct</option>
-                        <option value="repeated">repeated</option>
-                        <option value="inferred">inferred</option>
-                        <option value="assumed">assumed</option>
-                      </select>
-                      <select value={editVolatility} onChange={(e) => setEditVolatility(e.target.value)} className="bg-background border border-border rounded-lg px-2 py-1 text-xs focus:outline-none focus:border-accent/50">
-                        <option value="low">low</option>
-                        <option value="medium">medium</option>
-                        <option value="high">high</option>
-                      </select>
-                      <select value={editImportance} onChange={(e) => setEditImportance(e.target.value)} className="bg-background border border-border rounded-lg px-2 py-1 text-xs focus:outline-none focus:border-accent/50" title="Importance 1-10">
-                        {[1,2,3,4,5,6,7,8,9,10].map(n => <option key={n} value={n}>imp {n}</option>)}
-                      </select>
+                      <MemoryFieldDrawer
+                        value={editEvidence}
+                        onChange={setEditEvidence}
+                        title="Evidence level"
+                        className="bg-background border border-border rounded-lg px-2 py-1 text-xs"
+                        options={[{value:'direct',label:'direct'},{value:'repeated',label:'repeated'},{value:'inferred',label:'inferred'},{value:'assumed',label:'assumed'}]}
+                      />
+                      <MemoryFieldDrawer
+                        value={editVolatility}
+                        onChange={setEditVolatility}
+                        title="Volatility"
+                        className="bg-background border border-border rounded-lg px-2 py-1 text-xs"
+                        options={[{value:'low',label:'low'},{value:'medium',label:'medium'},{value:'high',label:'high'}]}
+                      />
+                      <MemoryFieldDrawer
+                        value={editImportance}
+                        onChange={setEditImportance}
+                        title="Importance (1-10)"
+                        className="bg-background border border-border rounded-lg px-2 py-1 text-xs"
+                        options={[1,2,3,4,5,6,7,8,9,10].map(n => ({value:n,label:`imp ${n}`}))}
+                      />
                       <div className="flex justify-end gap-2 ml-auto">
                         <button onClick={() => { setEditingId(null); setEditError(null); }} className="p-1.5 text-muted-foreground hover:text-foreground"><X className="w-4 h-4" /></button>
                         <button onClick={() => handleSaveEdit(mem.id)} disabled={savingId === mem.id} className="p-1.5 text-accent hover:text-accent/80 disabled:opacity-40"><Check className="w-4 h-4" /></button>
@@ -256,6 +269,6 @@ export default function Memory() {
       {shareMem && (
         <ShareMemoryModal memory={shareMem} workspaces={workspaces} currentUser={currentUser} onClose={() => setShareMem(null)} onShared={(ws) => handleShare(shareMem, ws)} />
       )}
-    </div>
+    </PullToRefresh>
   );
 }

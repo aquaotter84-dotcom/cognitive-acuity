@@ -81,12 +81,14 @@ export default function Sidebar({ onNavigate }) {
   return (
     <div className="flex flex-col h-full">
       <div className="px-4 py-4 flex items-center">
-        <Image
-          src={COGNOS_LOGO}
-          fittingType="fit"
-          className="h-[90px] w-[240px] mix-blend-screen"
-          alt="COGNOS"
-        />
+        <Link to={activeConversationId ? `/?c=${activeConversationId}` : '/'} aria-label="Back to active chat">
+          <Image
+            src={COGNOS_LOGO}
+            fittingType="fit"
+            className="h-[90px] w-[240px] mix-blend-screen"
+            alt="COGNOS"
+          />
+        </Link>
       </div>
 
       <div className="px-3 pb-3">

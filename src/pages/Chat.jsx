@@ -75,6 +75,23 @@ export default function Chat() {
       isNew = true;
     }
 
+    // Optimistic: append the user message immediately with a temp id so the UI
+    // never blocks on the Message.create round-trip; swap in the persisted
+    // record once it lands.
+    const tempId = `temp_${Date.now()}`;
+    const optimisticMsg = {
+      id: tempId,
+      conversation_id: convId,
+      workspace_id: activeWorkspace.id,
+      role: 'user',
+      content: text,
+      attachments: attachments.length ? attachments : undefined,
+      processing_status: 'complete',
+      created_date: new Date().toISOString(),
+      member_ids: memberIds
+    };
+    setMessages(prev => [...prev, optimisticMsg]);
+
     const userMsg = await base44.entities.Message.create({
       conversation_id: convId,
       workspace_id: activeWorkspace.id,
@@ -84,7 +101,7 @@ export default function Chat() {
       processing_status: 'complete',
       member_ids: memberIds
     });
-    setMessages(prev => [...prev, userMsg]);
+    setMessages(prev => prev.map(m => (m.id === tempId ? userMsg : m)));
 
     if (!isNew) {
       await base44.entities.Conversation.update(convId, {
@@ -191,7 +208,7 @@ export default function Chat() {
 
   return (
     <div className="flex flex-col h-full">
-      <header className="flex items-center gap-3 px-4 py-3 border-b border-border">
+      <header className="flex items-center gap-3 px-4 py-3 border-b border-border" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 0.75rem)' }}>
         <button onClick={openSidebar} className="md:hidden p-2 -ml-2 rounded-lg hover:bg-muted transition-colors">
           <Menu className="w-5 h-5" />
         </button>

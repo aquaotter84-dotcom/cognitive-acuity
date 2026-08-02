@@ -1,23 +1,28 @@
 import { Link, useLocation } from 'react-router-dom';
 import { MessageSquare, Brain, FolderKanban, Settings as SettingsIcon, FileText } from 'lucide-react';
-
-const navItems = [
-  { to: '/', label: 'Chat', icon: MessageSquare },
-  { to: '/memory', label: 'Memory', icon: Brain },
-  { to: '/documents', label: 'Docs', icon: FileText },
-  { to: '/workspaces', label: 'Spaces', icon: FolderKanban },
-  { to: '/settings', label: 'Settings', icon: SettingsIcon },
-];
+import { useCognos } from '@/lib/cognosContext';
 
 export default function MobileNav() {
   const location = useLocation();
+  const { activeConversationId } = useCognos();
+  // Chat tab preserves the active conversation so switching tabs never drops it.
+  const chatTo = activeConversationId ? `/?c=${activeConversationId}` : '/';
+
+  const navItems = [
+    { to: chatTo, path: '/', label: 'Chat', icon: MessageSquare },
+    { to: '/memory', path: '/memory', label: 'Memory', icon: Brain },
+    { to: '/documents', path: '/documents', label: 'Docs', icon: FileText },
+    { to: '/workspaces', path: '/workspaces', label: 'Spaces', icon: FolderKanban },
+    { to: '/settings', path: '/settings', label: 'Settings', icon: SettingsIcon },
+  ];
+
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-40 md:hidden border-t border-border bg-card/95 backdrop-blur select-none" style={{ paddingBottom: 'env(safe-area-inset-bottom, 12px)' }}>
       <div className="flex items-center justify-around py-2">
-        {navItems.map(({ to, label, icon: Icon }) => {
-          const isActive = location.pathname === to;
+        {navItems.map(({ to, path, label, icon: Icon }) => {
+          const isActive = location.pathname === path;
           return (
-            <Link key={to} to={to} className={`flex flex-col items-center gap-1 px-3 py-1.5 rounded-lg transition-colors ${isActive ? 'text-primary' : 'text-muted-foreground'}`}>
+            <Link key={path} to={to} className={`flex flex-col items-center gap-1 px-3 py-1.5 rounded-lg transition-colors ${isActive ? 'text-primary' : 'text-muted-foreground'}`}>
               <Icon className="w-5 h-5" />
               <span className="text-xs">{label}</span>
             </Link>

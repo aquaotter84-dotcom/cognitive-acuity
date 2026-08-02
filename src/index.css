@@ -127,6 +127,31 @@
     to { opacity: 1; }
   }
 
+  /* Mobile WebView: prevent accidental text/image selection on chrome elements.
+     Real content (paragraphs, lists, code, inputs) stays selectable. */
+  button,
+  nav,
+  header,
+  [role="tab"],
+  [role="tablist"],
+  .no-select {
+    -webkit-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+  }
+  .selectable,
+  input,
+  textarea,
+  [contenteditable],
+  p,
+  li,
+  code,
+  pre {
+    -webkit-user-select: text;
+    user-select: text;
+  }
+
   /* Mobile: enlarge icons and give icon-only controls a 48px tap target.
      Applies on small viewports (phones); desktop layouts stay compact. */
   @media (max-width: 768px) {
