@@ -9,6 +9,7 @@ import ChatMessage from '@/components/chat/ChatMessage';
 import ChatInput from '@/components/chat/ChatInput';
 import WelcomeScreen from '@/components/chat/WelcomeScreen';
 import ConversationOverlay from '@/components/chat/ConversationOverlay';
+import { extractAttachmentContext } from '@/lib/documentAnalysis';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 
 export default function Chat() {
@@ -94,11 +95,19 @@ export default function Chat() {
     setIsProcessing(true);
     abortRef.current = false;
 
+    let enrichedText = text;
+    if (attachments.length) {
+      try {
+        const ctx = await extractAttachmentContext(attachments);
+        if (ctx) enrichedText = `${text}\n\n${ctx}`;
+      } catch (e) { /* ignore extraction failures */ }
+    }
+
     try {
       const result = await base44.functions.invoke('chatOrchestrate', {
         conversationId: convId,
         workspaceId: activeWorkspace.id,
-        userMessage: text,
+        userMessage: enrichedText,
         style,
         attachments,
         webSearch

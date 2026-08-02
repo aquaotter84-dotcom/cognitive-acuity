@@ -1,9 +1,10 @@
 import { Link, useLocation } from 'react-router-dom';
-import { MessageSquare, Brain, FolderKanban, Settings as SettingsIcon } from 'lucide-react';
+import { MessageSquare, Brain, FolderKanban, Settings as SettingsIcon, FileText } from 'lucide-react';
 
 const navItems = [
   { to: '/', label: 'Chat', icon: MessageSquare },
   { to: '/memory', label: 'Memory', icon: Brain },
+  { to: '/documents', label: 'Docs', icon: FileText },
   { to: '/workspaces', label: 'Spaces', icon: FolderKanban },
   { to: '/settings', label: 'Settings', icon: SettingsIcon },
 ];
