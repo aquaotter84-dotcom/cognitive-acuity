@@ -19,6 +19,11 @@ import os
 import sys
 import json
 import httpx
+
+# Load .env early so the preflight check sees local values. The livekit CLI
+# also loads .env, but only inside cli.run_app — which runs AFTER preflight.
+from dotenv import load_dotenv
+load_dotenv()
 from livekit.agents import (
     Agent,
     AgentSession,
