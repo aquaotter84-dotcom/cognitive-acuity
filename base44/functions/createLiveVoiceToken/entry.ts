@@ -62,10 +62,12 @@ export default async function(req) {
 
     const apiKey = secrets.get('LIVEKIT_API_KEY');
     const apiSecret = secrets.get('LIVEKIT_API_SECRET');
-    const url = secrets.get('LIVEKIT_URL');
+    let url = secrets.get('LIVEKIT_URL');
     if (!apiKey || !apiSecret || !url) {
       return Response.json({ error: 'LiveKit credentials are not configured' }, { status: 500 });
     }
+    // LiveKit expects a WebSocket URL; accept a bare hostname too.
+    if (!/^wss?:\/\//i.test(url)) url = 'wss://' + url.replace(/^\/+/, '');
 
     const body = await req.json().catch(() => ({}));
     const workspaceId = body.workspaceId;
