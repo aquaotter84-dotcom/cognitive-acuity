@@ -18,6 +18,7 @@ export default function PublicLayout() {
           <nav className="flex items-center gap-4 text-sm">
             <Link to="/about" className="text-muted-foreground hover:text-foreground transition-colors">About</Link>
             <Link to="/contact" className="text-muted-foreground hover:text-foreground transition-colors">Contact</Link>
+            <Link to="/privacy" className="text-muted-foreground hover:text-foreground transition-colors">Privacy</Link>
             <Link to="/login" className="text-primary hover:text-primary/80 transition-colors">Sign in</Link>
           </nav>
         </div>
@@ -33,6 +34,7 @@ export default function PublicLayout() {
           <nav className="flex items-center gap-4">
             <Link to="/about" className="hover:text-foreground transition-colors">About</Link>
             <Link to="/contact" className="hover:text-foreground transition-colors">Contact</Link>
+            <Link to="/privacy" className="hover:text-foreground transition-colors">Privacy</Link>
             <Link to="/login" className="hover:text-foreground transition-colors">Sign in</Link>
           </nav>
         </div>

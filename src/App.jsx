@@ -19,6 +19,7 @@ import Beliefs from '@/pages/Beliefs';
 import AgentChat from '@/pages/AgentChat';
 import About from '@/pages/About';
 import Contact from '@/pages/Contact';
+import Privacy from '@/pages/Privacy';
 import PublicLayout from '@/components/PublicLayout';
 import Login from '@/pages/Login';
 import Register from '@/pages/Register';
@@ -71,6 +72,7 @@ const AuthenticatedApp = () => {
       <Route element={<PublicLayout />}>
         <Route path="/about" element={<About />} />
         <Route path="/contact" element={<Contact />} />
+        <Route path="/privacy" element={<Privacy />} />
       </Route>
       <Route path="*" element={<PageNotFound />} />
     </Routes>
