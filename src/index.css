@@ -127,18 +127,17 @@
     to { opacity: 1; }
   }
 
-  /* Touch screens: enlarge icons and give icon-only controls a 44px tap target.
-     Desktop (fine pointer) is untouched, so compact layouts are preserved. */
-  @media (pointer: coarse) {
+  /* Mobile: enlarge icons and give icon-only controls a 48px tap target.
+     Applies on small viewports (phones); desktop layouts stay compact. */
+  @media (max-width: 768px) {
     button > svg,
     a > svg {
-      width: 1.375rem !important;
-      height: 1.375rem !important;
+      width: 1.5rem !important;
+      height: 1.5rem !important;
     }
     button:has(> svg:only-child),
     a:has(> svg:only-child) {
-      min-height: 2.75rem;
-      min-width: 2.75rem;
+      min-height: 3rem;
     }
   }
 }
