@@ -27,14 +27,23 @@
       "items": {
         "type": "object",
         "properties": {
+          "key": {
+            "type": "string",
+            "description": "Stable normalized-claim key used to match a belief across derivation runs."
+          },
           "claim": {
             "type": "string"
           },
           "category": {
             "type": "string"
           },
+          "base": {
+            "type": "number",
+            "description": "Confidence as emitted by the LLM, before deterministic propagation."
+          },
           "confidence": {
-            "type": "number"
+            "type": "number",
+            "description": "Live (propagated) confidence after the deterministic relationship pass \u2014 the value the UI shows and the ledger diffs."
           },
           "supporting_evidence": {
             "type": "array",
@@ -69,10 +78,86 @@
           },
           "last_challenged": {
             "type": "string"
+          },
+          "drivers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "subject_id": {
+                  "type": "string"
+                },
+                "subject_label": {
+                  "type": "string"
+                },
+                "relationship": {
+                  "type": "string",
+                  "description": "supports | contradicts | depends_on"
+                },
+                "weight": {
+                  "type": "number"
+                },
+                "related_confidence": {
+                  "type": "number"
+                },
+                "contribution": {
+                  "type": "number",
+                  "description": "Signed delta this driver applied to the belief's confidence."
+                },
+                "via": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "description": "The deterministic propagation drivers that moved this belief's confidence away from its base. The structured 'why' for a revision."
           }
         }
       },
-      "description": "The full derived belief set at this point in time. This is history, not asserted truth \u2014 current beliefs are always re-derived on demand (Phase 13). The snapshot exists so Phase 14 can diff across time."
+      "description": "The full derived belief set at this point in time, enriched with the deterministic propagation result. History, not asserted truth \u2014 current beliefs are always re-derived on demand (Phase 13). The snapshot exists so Phase 14 can diff across time."
+    },
+    "relationships": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "source": {
+            "type": "string",
+            "description": "Belief key the edge leaves from (the one being influenced)."
+          },
+          "target": {
+            "type": "string",
+            "description": "Belief key the edge points to (the influencer)."
+          },
+          "source_label": {
+            "type": "string"
+          },
+          "target_label": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "supports",
+              "contradicts",
+              "depends_on"
+            ]
+          },
+          "weight": {
+            "type": "number"
+          },
+          "via": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Evidence ids that establish this relationship."
+          }
+        }
+      },
+      "description": "The deterministic belief\u2194belief relationship graph inferred from shared/conflicting evidence at this derivation. Tiny ontology v1: supports, contradicts, depends_on. Stored so the relationship dynamics are replayable alongside the beliefs."
     },
     "evidence_manifest": {
       "type": "array",

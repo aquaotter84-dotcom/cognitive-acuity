@@ -28,7 +28,9 @@
         "belief_revised",
         "belief_collapsed",
         "identity_established",
-        "identity_revised"
+        "identity_revised",
+        "relationship_formed",
+        "relationship_broken"
       ],
       "description": "The kind of state transition recorded. Change is the primary object; the ledger never stores conclusions, only transitions."
     },
@@ -37,17 +39,18 @@
       "enum": [
         "memory",
         "belief",
-        "identity"
+        "identity",
+        "relationship"
       ],
       "description": "What kind of subject changed."
     },
     "subject_id": {
       "type": "string",
-      "description": "Stable id of the subject: memory id, normalized belief key, or 'identity'."
+      "description": "Stable id of the subject: memory id, normalized belief key, 'identity', or 'source|type|target' for relationships."
     },
     "subject_label": {
       "type": "string",
-      "description": "Human-readable label: the belief claim, a memory content preview, or 'Identity'."
+      "description": "Human-readable label: the belief claim, a memory content preview, 'Identity', or a relationship phrase."
     },
     "from_state": {
       "type": "object",
@@ -61,12 +64,17 @@
     },
     "delta": {
       "type": "number",
-      "description": "Numeric change where meaningful: confidence delta for beliefs, +/-1 for evidence add/remove, importance delta for reweight.",
+      "description": "Numeric change where meaningful: confidence delta for beliefs, +/-1 for evidence add/remove, importance delta for reweight, weight for relationships.",
       "default": 0
     },
     "cause": {
       "type": "string",
-      "description": "Why this transition was recorded \u2014 e.g. 're-derivation', 'new evidence'."
+      "description": "Human-readable summary of why this transition was recorded."
+    },
+    "cause_metadata": {
+      "type": "object",
+      "description": "Structured 'why': for belief revisions this decomposes the change into base-evidence drift and deterministic propagation drivers (related beliefs, relationship type, weight, contribution). Lets COGNOS answer 'why did this belief change?' from the ledger alone.",
+      "properties": {}
     }
   },
   "required": [

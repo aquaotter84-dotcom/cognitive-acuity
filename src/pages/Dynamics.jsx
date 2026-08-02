@@ -16,6 +16,7 @@ const FILTERS = [
   { value: 'all', label: 'All transitions' },
   { value: 'memory', label: 'Evidence' },
   { value: 'belief', label: 'Beliefs' },
+  { value: 'relationship', label: 'Relationships' },
   { value: 'identity', label: 'Identity' }
 ];
 
@@ -87,6 +88,7 @@ export default function Dynamics() {
             <div className="flex items-center gap-2 text-xs">
               <span className="px-2 py-0.5 rounded-full bg-primary/10 text-primary">Evidence {counts.memory || 0}</span>
               <span className="px-2 py-0.5 rounded-full bg-accent/10 text-accent">Beliefs {counts.belief || 0}</span>
+              <span className="px-2 py-0.5 rounded-full bg-chart-4/10 text-chart-4">Rel {counts.relationship || 0}</span>
               <span className="px-2 py-0.5 rounded-full bg-emerald-400/10 text-emerald-400">Identity {counts.identity || 0}</span>
             </div>
           </div>

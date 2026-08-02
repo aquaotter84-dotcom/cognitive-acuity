@@ -1,22 +1,18 @@
 // Phase 13 — Cognitive Physics: Belief Derivation Engine.
-// Phase 14 — Dynamic Systems: derivation now records transitions, not conclusions.
+// Phase 14 — Dynamic Systems: derivation records transitions + relationship dynamics.
 //
-// Law 1 (Everything is evidence): Memory rows are treated as evidence, not truth.
-// Law 2 (State is derived): Beliefs are computed on demand — never stored as fact.
-// Law 3 (Every belief is falsifiable): each belief carries supporting/contradicting
-//   evidence, confidence, rationale, and last-challenged timestamp.
-// Law 6 (Every decision is traceable): beliefs reference the evidence ids they came from.
-//
-// Phase 14 first principles layered on top:
+// Laws 1–6 still in force (beliefs are derived, falsifiable, traceable). Phase 14 layers:
 //   - Change is fundamental: the system stores transitions, never conclusions.
 //   - State is temporary: the current derivation is one equilibrium; history is persisted.
 //   - Every change is reversible: a BeliefSnapshot chain lets the ledger replay itself.
 //
-// This function reads a workspace's evidence (Memory records), synthesizes falsifiable
-// beliefs, then diffs the result against the last BeliefSnapshot and records every
-// detected transition (evidence added/removed/reweighted, belief emerged/revised/
-// collapsed, identity revised) to the ChangeEvent ledger. The returned beliefs are
-// still conclusions-for-now; the ledger is the permanent, replayable record.
+// Relationship Dynamics Engine v1 (deterministic, no LLM):
+//   After the LLM emits falsifiable beliefs, a deterministic pass infers a tiny
+//   belief↔belief ontology (supports / contradicts / depends_on) from shared and
+//   conflicting evidence, then propagates each belief's confidence along those edges
+//   in a single pass. Every resulting adjustment and every relationship formed/broken
+//   is recorded as a ChangeEvent carrying structured cause_metadata — so the ledger
+//   alone can answer "why did this belief change?".
 
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.40';
 import { createLogger } from "../../shared/logging.ts";
@@ -25,6 +21,10 @@ import { callLLM } from "../../shared/llm.ts";
 import { CognosError, wrapHandler } from "../../shared/errors.ts";
 
 const rootLogger = createLogger("deriveBeliefs");
+
+const PROPAGATION_FACTOR = 0.25;
+const RELATIONSHIP_SIGN = { supports: 1, depends_on: 1, contradicts: -1 };
+const REVISION_THRESHOLD = 0.05;
 
 const BELIEF_SCHEMA = {
   type: "object",
@@ -43,18 +43,12 @@ const BELIEF_SCHEMA = {
           confidence: { type: "number", description: "0.0 to 1.0 — high only with direct/repeated evidence; low for inferred/assumed." },
           supporting_evidence: {
             type: "array",
-            items: {
-              type: "object",
-              properties: { id: { type: "string" }, quote: { type: "string" } }
-            },
+            items: { type: "object", properties: { id: { type: "string" }, quote: { type: "string" } } },
             description: "Evidence records that support this belief, with the evidence id and a short quote."
           },
           contradicting_evidence: {
             type: "array",
-            items: {
-              type: "object",
-              properties: { id: { type: "string" }, quote: { type: "string" } }
-            },
+            items: { type: "object", properties: { id: { type: "string" }, quote: { type: "string" } } },
             description: "Evidence records that contradict or weaken this belief (may be empty)."
           },
           rationale: { type: "string", description: "Why this belief is held, given the evidence." },
@@ -65,7 +59,7 @@ const BELIEF_SCHEMA = {
   }
 };
 
-// --- Phase 14: transition detection -------------------------------------
+// --- Phase 14: transition + relationship detection ---------------------
 
 function normalizeClaim(s) {
   return String(s || '').toLowerCase().replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
@@ -78,24 +72,164 @@ function claimKey(claim) {
   return (h >>> 0).toString(36);
 }
 
+function relKey(r) {
+  return `${r.source}|${r.type}|${r.target}`;
+}
+
+// Tiny ontology v1 — inferred deterministically from evidence overlap.
+function inferRelationships(beliefs) {
+  const rels = [];
+  const add = (source, target, type, weight, via, sLabel, tLabel) => rels.push({
+    source, target, type,
+    weight: Math.max(0, Math.min(1, Number(weight.toFixed(3)))),
+    via: (via || []).slice(0, 4),
+    source_label: sLabel,
+    target_label: tLabel
+  });
+
+  for (let i = 0; i < beliefs.length; i++) {
+    for (let j = i + 1; j < beliefs.length; j++) {
+      const A = beliefs[i], B = beliefs[j];
+      const aSup = new Set(A.supporting || []);
+      const bSup = new Set(B.supporting || []);
+      const aCon = new Set(A.contradicting || []);
+      const bCon = new Set(B.contradicting || []);
+      const shared = [...aSup].filter(x => bSup.has(x));
+      const conflict = [...aSup].filter(x => bCon.has(x)).concat([...bSup].filter(x => aCon.has(x)));
+      const denom = aSup.size + bSup.size + 1;
+
+      if (conflict.length) {
+        const w = conflict.length / denom;
+        add(A.key, B.key, 'contradicts', w, conflict, A.claim, B.claim);
+        add(B.key, A.key, 'contradicts', w, conflict, B.claim, A.claim);
+      } else if (shared.length) {
+        const union = new Set([...aSup, ...bSup]).size || 1;
+        const bSubA = bSup.size > 0 && bSup.size < aSup.size && [...bSup].every(x => aSup.has(x));
+        const aSubB = aSup.size > 0 && aSup.size < bSup.size && [...aSup].every(x => bSup.has(x));
+        if (bSubA) {
+          add(A.key, B.key, 'depends_on', bSup.size / aSup.size, shared, A.claim, B.claim);
+        } else if (aSubB) {
+          add(B.key, A.key, 'depends_on', aSup.size / bSup.size, shared, B.claim, A.claim);
+        } else {
+          const w = shared.length / union;
+          add(A.key, B.key, 'supports', w, shared, A.claim, B.claim);
+          add(B.key, A.key, 'supports', w, shared, B.claim, A.claim);
+        }
+      }
+    }
+  }
+  return rels;
+}
+
+// Single deterministic pass. Uses each influencer's BASE confidence (not its
+// propagated value) so there are no cascades or convergence loops — v1 stays
+// simple, bounded, and fully deterministic.
+function propagate(beliefs, rels) {
+  const byKey = new Map(beliefs.map(b => [b.key, b]));
+  for (const b of beliefs) { b.drivers = []; b.confidence = b.base; }
+  for (const r of rels) {
+    const src = byKey.get(r.source);
+    const tgt = byKey.get(r.target);
+    if (!src || !tgt) continue;
+    const contribution = RELATIONSHIP_SIGN[r.type] * r.weight * (tgt.base ?? 0) * PROPAGATION_FACTOR;
+    src.confidence = (src.confidence ?? src.base) + contribution;
+    src.drivers.push({
+      subject_id: tgt.key,
+      subject_label: tgt.claim,
+      relationship: r.type,
+      weight: r.weight,
+      related_confidence: tgt.base,
+      contribution: Number(contribution.toFixed(4)),
+      via: r.via
+    });
+  }
+  for (const b of beliefs) {
+    b.drivers.sort((a, c) => Math.abs(c.contribution) - Math.abs(a.contribution));
+    b.confidence = Number(Math.max(0.05, Math.min(0.99, b.confidence)).toFixed(3));
+  }
+  return beliefs;
+}
+
+function summarizeDrivers(drivers) {
+  if (!drivers || !drivers.length) return 'none';
+  return drivers.slice(0, 3).map(d => {
+    const lbl = String(d.subject_label || '').slice(0, 38);
+    const sign = d.contribution >= 0 ? '+' : '';
+    return `${d.relationship} "${lbl}" (${sign}${d.contribution})`;
+  }).join('; ');
+}
+
 function diffBeliefs(prev, curr) {
   const out = [];
-  const prevMap = new Map((prev || []).map(b => [claimKey(b.claim), b]));
-  const currMap = new Map((curr || []).map(b => [claimKey(b.claim), b]));
+  const prevMap = new Map((prev || []).map(b => [b.key, b]));
+  const currMap = new Map((curr || []).map(b => [b.key, b]));
   for (const [key, b] of currMap) {
+    const propDelta = Number(((b.confidence ?? 0) - (b.base ?? 0)).toFixed(3));
     if (!prevMap.has(key)) {
-      out.push({ event_type: 'belief_emerged', subject_type: 'belief', subject_id: key, subject_label: b.claim, from_state: null, to_state: { confidence: b.confidence, category: b.category }, delta: b.confidence ?? 0, cause: 're-derivation' });
+      out.push({
+        event_type: 'belief_emerged', subject_type: 'belief', subject_id: key, subject_label: b.claim,
+        from_state: null,
+        to_state: { confidence: b.confidence, base: b.base },
+        delta: b.confidence ?? 0,
+        cause: `emerged from current evidence; propagation ${propDelta >= 0 ? '+' : ''}${propDelta} (${summarizeDrivers(b.drivers)})`,
+        cause_metadata: { base: b.base, confidence: b.confidence, propagation_delta: propDelta, drivers: b.drivers || [] }
+      });
     } else {
       const p = prevMap.get(key);
-      const d = (b.confidence ?? 0) - (p.confidence ?? 0);
-      if (Math.abs(d) >= 0.1) {
-        out.push({ event_type: 'belief_revised', subject_type: 'belief', subject_id: key, subject_label: b.claim, from_state: { confidence: p.confidence }, to_state: { confidence: b.confidence, category: b.category }, delta: d, cause: 're-derivation' });
+      const d = Number(((b.confidence ?? 0) - (p.confidence ?? 0)).toFixed(3));
+      if (Math.abs(d) >= REVISION_THRESHOLD) {
+        const baseDelta = Number(((b.base ?? 0) - (p.base ?? 0)).toFixed(3));
+        const cause = `base ${(p.base ?? 0).toFixed(2)}→${(b.base ?? 0).toFixed(2)} (${baseDelta >= 0 ? '+' : ''}${baseDelta}); propagation ${propDelta >= 0 ? '+' : ''}${propDelta} (${summarizeDrivers(b.drivers)})`;
+        out.push({
+          event_type: 'belief_revised', subject_type: 'belief', subject_id: key, subject_label: b.claim,
+          from_state: { confidence: p.confidence, base: p.base },
+          to_state: { confidence: b.confidence, base: b.base },
+          delta: d, cause,
+          cause_metadata: {
+            base_prev: p.base, base_now: b.base, base_delta: baseDelta,
+            propagation_delta: propDelta, drivers: b.drivers || []
+          }
+        });
       }
     }
   }
   for (const [key, p] of prevMap) {
     if (!currMap.has(key)) {
-      out.push({ event_type: 'belief_collapsed', subject_type: 'belief', subject_id: key, subject_label: p.claim, from_state: { confidence: p.confidence }, to_state: null, delta: -(p.confidence ?? 0), cause: 'no longer supported by current evidence' });
+      out.push({
+        event_type: 'belief_collapsed', subject_type: 'belief', subject_id: key, subject_label: p.claim,
+        from_state: { confidence: p.confidence, base: p.base }, to_state: null,
+        delta: -(p.confidence ?? 0), cause: 'no longer supported by current evidence',
+        cause_metadata: null
+      });
+    }
+  }
+  return out;
+}
+
+function diffRelationships(prev, curr) {
+  const out = [];
+  const prevMap = new Map((prev || []).map(r => [relKey(r), r]));
+  const currMap = new Map((curr || []).map(r => [relKey(r), r]));
+  for (const [k, r] of currMap) {
+    if (!prevMap.has(k)) {
+      out.push({
+        event_type: 'relationship_formed', subject_type: 'relationship', subject_id: k,
+        subject_label: `"${String(r.source_label || '').slice(0, 36)}" ${r.type} "${String(r.target_label || '').slice(0, 36)}"`,
+        from_state: null, to_state: { weight: r.weight, type: r.type },
+        delta: r.weight, cause: 'deterministic inference from shared/conflicting evidence',
+        cause_metadata: { source: r.source, target: r.target, type: r.type, weight: r.weight, via: r.via }
+      });
+    }
+  }
+  for (const [k, r] of prevMap) {
+    if (!currMap.has(k)) {
+      out.push({
+        event_type: 'relationship_broken', subject_type: 'relationship', subject_id: k,
+        subject_label: `"${String(r.source_label || '').slice(0, 36)}" ${r.type} "${String(r.target_label || '').slice(0, 36)}"`,
+        from_state: { weight: r.weight, type: r.type }, to_state: null,
+        delta: -r.weight, cause: 'evidence overlap changed',
+        cause_metadata: { source: r.source, target: r.target, type: r.type, weight: r.weight, via: r.via }
+      });
     }
   }
   return out;
@@ -107,17 +241,17 @@ function diffEvidence(prev, curr) {
   const currMap = new Map((curr || []).map(e => [e.id, e]));
   for (const [id, e] of currMap) {
     if (!prevMap.has(id)) {
-      out.push({ event_type: 'evidence_added', subject_type: 'memory', subject_id: id, subject_label: e.content_preview || id, from_state: null, to_state: { importance: e.importance, evidence_level: e.evidence_level }, delta: 1, cause: 'new evidence in workspace' });
+      out.push({ event_type: 'evidence_added', subject_type: 'memory', subject_id: id, subject_label: e.content_preview || id, from_state: null, to_state: { importance: e.importance, evidence_level: e.evidence_level }, delta: 1, cause: 'new evidence in workspace', cause_metadata: null });
     } else {
       const p = prevMap.get(id);
       if ((p.importance ?? 0) !== (e.importance ?? 0) || (p.evidence_level || '') !== (e.evidence_level || '')) {
-        out.push({ event_type: 'evidence_reweighted', subject_type: 'memory', subject_id: id, subject_label: e.content_preview || id, from_state: { importance: p.importance, evidence_level: p.evidence_level }, to_state: { importance: e.importance, evidence_level: e.evidence_level }, delta: (e.importance ?? 0) - (p.importance ?? 0), cause: 'evidence attributes changed' });
+        out.push({ event_type: 'evidence_reweighted', subject_type: 'memory', subject_id: id, subject_label: e.content_preview || id, from_state: { importance: p.importance, evidence_level: p.evidence_level }, to_state: { importance: e.importance, evidence_level: e.evidence_level }, delta: (e.importance ?? 0) - (p.importance ?? 0), cause: 'evidence attributes changed', cause_metadata: null });
       }
     }
   }
   for (const [id, p] of prevMap) {
     if (!currMap.has(id)) {
-      out.push({ event_type: 'evidence_removed', subject_type: 'memory', subject_id: id, subject_label: p.content_preview || id, from_state: { importance: p.importance, evidence_level: p.evidence_level }, to_state: null, delta: -1, cause: 'evidence disabled or deleted' });
+      out.push({ event_type: 'evidence_removed', subject_type: 'memory', subject_id: id, subject_label: p.content_preview || id, from_state: { importance: p.importance, evidence_level: p.evidence_level }, to_state: null, delta: -1, cause: 'evidence disabled or deleted', cause_metadata: null });
     }
   }
   return out;
@@ -125,8 +259,8 @@ function diffEvidence(prev, curr) {
 
 function diffIdentity(prevIdentity, currIdentity, hadPrev) {
   if (!currIdentity) return null;
-  if (!hadPrev) return { event_type: 'identity_established', subject_type: 'identity', subject_id: 'identity', subject_label: 'Identity', from_state: null, to_state: { identity: currIdentity }, delta: 1, cause: 'initial derivation' };
-  if (prevIdentity && prevIdentity !== currIdentity) return { event_type: 'identity_revised', subject_type: 'identity', subject_id: 'identity', subject_label: 'Identity', from_state: { identity: prevIdentity }, to_state: { identity: currIdentity }, delta: 0, cause: 'identity shifted with new evidence' };
+  if (!hadPrev) return { event_type: 'identity_established', subject_type: 'identity', subject_id: 'identity', subject_label: 'Identity', from_state: null, to_state: { identity: currIdentity }, delta: 1, cause: 'initial derivation', cause_metadata: null };
+  if (prevIdentity && prevIdentity !== currIdentity) return { event_type: 'identity_revised', subject_type: 'identity', subject_id: 'identity', subject_label: 'Identity', from_state: { identity: prevIdentity }, to_state: { identity: currIdentity }, delta: 0, cause: 'identity shifted with new evidence', cause_metadata: null };
   return null;
 }
 
@@ -143,7 +277,6 @@ async function handle(req) {
   const logger = rootLogger.child("engine");
   const ctx = { base44, config, logger, timings: {} };
 
-  // --- Gather evidence (Memory as the evidence archive) ---
   const evidence = await base44.entities.Memory.filter(
     { workspace_id: workspaceId, is_enabled: true },
     '-importance',
@@ -152,25 +285,18 @@ async function handle(req) {
 
   if (!evidence || evidence.length === 0) {
     return Response.json({
-      identity: null,
-      beliefs: [],
-      evidenceCount: 0,
-      derivedAt: new Date().toISOString(),
-      transitions: { evidence: 0, beliefs: 0, identity: 0, total: 0 },
+      identity: null, beliefs: [], evidenceCount: 0, derivedAt: new Date().toISOString(),
+      transitions: { evidence: 0, beliefs: 0, relationships: 0, identity: 0, total: 0 },
       note: "No evidence available yet — beliefs cannot be derived until COGNOS has gathered memories from your conversations."
     });
   }
 
   const inventory = evidence.map(m => ({
-    id: m.id,
-    content: m.content,
-    evidence_level: m.evidence_level || 'inferred',
-    volatility: m.volatility || 'medium',
-    last_confirmed: m.last_confirmed || null,
-    importance: m.importance || 5
+    id: m.id, content: m.content,
+    evidence_level: m.evidence_level || 'inferred', volatility: m.volatility || 'medium',
+    last_confirmed: m.last_confirmed || null, importance: m.importance || 5
   }));
 
-  // --- Phase 14: load the last derivation snapshot to diff against ---
   let lastSnap = null;
   try {
     const prev = await base44.entities.BeliefSnapshot.filter({ workspace_id: workspaceId }, '-derived_at', 1);
@@ -203,23 +329,35 @@ Prefer a few well-supported beliefs over many speculative ones. If the evidence 
     ]
   });
 
-  const beliefs = Array.isArray(result?.beliefs) ? result.beliefs.filter(b => b && b.claim) : [];
+  const rawBeliefs = Array.isArray(result?.beliefs) ? result.beliefs.filter(b => b && b.claim) : [];
   const identity = result?.identity || null;
 
-  // --- Phase 14: detect transitions (change as the primary object) ---
+  // Enrich with the keys + evidence-id sets the deterministic engine needs.
+  const beliefs = rawBeliefs.map(b => ({
+    ...b,
+    key: claimKey(b.claim),
+    base: typeof b.confidence === 'number' ? b.confidence : 0.5,
+    supporting: (b.supporting_evidence || []).map(x => x.id).filter(Boolean),
+    contradicting: (b.contradicting_evidence || []).map(x => x.id).filter(Boolean)
+  }));
+
+  // --- Relationship Dynamics Engine v1 (deterministic) ---
+  const relationships = inferRelationships(beliefs);
+  propagate(beliefs, relationships);
+
+  // --- Transition detection across the ledger ---
   const currentManifest = evidence.map(m => ({
-    id: m.id,
-    importance: m.importance || 5,
+    id: m.id, importance: m.importance || 5,
     evidence_level: m.evidence_level || 'inferred',
     content_preview: String(m.content || '').slice(0, 80)
   }));
   const evTransitions = diffEvidence(lastSnap?.evidence_manifest || [], currentManifest);
+  const relTransitions = diffRelationships(lastSnap?.relationships || [], relationships);
   const beliefTransitions = diffBeliefs(lastSnap?.beliefs || [], beliefs);
   const idTransition = diffIdentity(lastSnap?.identity || null, identity, !!lastSnap);
-  const transitions = [...evTransitions, ...beliefTransitions];
+  const transitions = [...evTransitions, ...relTransitions, ...beliefTransitions];
   if (idTransition) transitions.push(idTransition);
 
-  // Workspace members for RLS scoping of snapshot + events.
   let memberIds = [user.id];
   try {
     const ws = await base44.entities.Workspace.get(workspaceId);
@@ -228,17 +366,13 @@ Prefer a few well-supported beliefs over many speculative ones. If the evidence 
     logger.warn("workspace lookup failed", { error: String(e) });
   }
 
-  // --- Phase 14 Principle 6: persist the derivation snapshot (replayable history) ---
   let snapId = null;
   try {
     const snap = await base44.entities.BeliefSnapshot.create({
-      workspace_id: workspaceId,
-      member_ids: memberIds,
+      workspace_id: workspaceId, member_ids: memberIds,
       prior_snapshot_id: lastSnap?.id || null,
-      identity,
-      beliefs,
-      evidence_manifest: currentManifest,
-      evidence_count: evidence.length,
+      identity, beliefs, relationships,
+      evidence_manifest: currentManifest, evidence_count: evidence.length,
       derived_at: new Date().toISOString()
     });
     snapId = snap.id;
@@ -246,7 +380,6 @@ Prefer a few well-supported beliefs over many speculative ones. If the evidence 
     logger.warn("snapshot persist failed", { error: String(e) });
   }
 
-  // --- Phase 14 Principle 1: record every transition to the permanent ledger ---
   if (snapId && transitions.length) {
     try {
       await base44.entities.ChangeEvent.bulkCreate(
@@ -257,32 +390,23 @@ Prefer a few well-supported beliefs over many speculative ones. If the evidence 
     }
   }
 
-  // Best-effort audit trail: record that a derivation occurred.
   try {
     await base44.entities.AuditEvent.create({
-      user_id: user.id,
-      workspace_id: workspaceId,
-      event_type: 'memory_operation',
-      agent_type: 'beliefDerivation',
-      model_used: ctx.config.models.memory,
-      task_type: 'analysis',
-      status: 'success',
-      description: `Derived ${beliefs.length} falsifiable beliefs from ${evidence.length} evidence records. Recorded ${transitions.length} state transitions.`
+      user_id: user.id, workspace_id: workspaceId,
+      event_type: 'memory_operation', agent_type: 'beliefDerivation',
+      model_used: ctx.config.models.memory, task_type: 'analysis', status: 'success',
+      description: `Derived ${beliefs.length} beliefs (${relationships.length} relationships) from ${evidence.length} evidence records. Recorded ${transitions.length} transitions.`
     });
   } catch (e) {
     logger.warn("belief derivation audit failed", { error: String(e) });
   }
 
   return Response.json({
-    identity,
-    beliefs,
-    evidenceCount: evidence.length,
-    derivedAt: new Date().toISOString(),
-    runId: snapId,
+    identity, beliefs, evidenceCount: evidence.length, derivedAt: new Date().toISOString(), runId: snapId,
+    relationships: { count: relationships.length, supports: relationships.filter(r => r.type === 'supports').length, contradicts: relationships.filter(r => r.type === 'contradicts').length, depends_on: relationships.filter(r => r.type === 'depends_on').length },
     transitions: {
-      evidence: evTransitions.length,
-      beliefs: beliefTransitions.length,
-      identity: idTransition ? 1 : 0,
+      evidence: evTransitions.length, relationships: relTransitions.length,
+      beliefs: beliefTransitions.length, identity: idTransition ? 1 : 0,
       total: transitions.length
     }
   });
