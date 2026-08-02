@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Brain, Plus, Search, FolderKanban, Settings as SettingsIcon, Activity as ActivityIcon, Sparkles, Bot, FileText, Atom, History, Network } from 'lucide-react';
+import { Brain, Plus, Search, FolderKanban, Settings as SettingsIcon, Activity as ActivityIcon, Sparkles, Bot, FileText, Atom, History, Network, MessagesSquare } from 'lucide-react';
 import { useCognos } from '@/lib/cognosContext';
 import { base44 } from '@/api/base44Client';
 import { Image } from '@/components/ui/image';
@@ -159,6 +159,9 @@ export default function Sidebar({ onNavigate }) {
       </div>
 
       <div className="border-t border-border p-2 space-y-0.5">
+        <Link to="/threads" className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-muted/50 text-sm transition-colors" onClick={onNavigate}>
+          <MessagesSquare className="w-4 h-4 text-primary" /> Threads
+        </Link>
         <Link to="/memory" className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-muted/50 text-sm transition-colors" onClick={onNavigate}>
           <Brain className="w-4 h-4 text-accent" /> Memory
         </Link>

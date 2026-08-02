@@ -9,6 +9,7 @@ import ScrollToTop from './components/ScrollToTop';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import CognosLayout from '@/components/CognosLayout';
 import Chat from '@/pages/Chat';
+import Threads from '@/pages/Threads';
 import Memory from '@/pages/Memory';
 import Workspaces from '@/pages/Workspaces';
 import Settings from '@/pages/Settings';
@@ -57,6 +58,7 @@ const AuthenticatedApp = () => {
       <Route element={<ProtectedRoute unauthenticatedElement={<Navigate to="/login" replace />} />}>
         <Route element={<CognosLayout />}>
           <Route path="/" element={<Chat />} />
+          <Route path="/threads" element={<Threads />} />
           <Route path="/memory" element={<Memory />} />
           <Route path="/insights" element={<Insights />} />
           <Route path="/documents" element={<Documents />} />
