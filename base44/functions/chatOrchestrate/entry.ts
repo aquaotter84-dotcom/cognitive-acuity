@@ -1,5 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.40';
-import { secrets } from 'base44:runtime';
+import { secretsk-DFu9Sn2ylS4P2ZTTd2Xn7sIlsxHt9lMTXxg8HzfnkEmWDLj4îs } from 'base44:runtime';
 
 // Phase 1 nervous system
 import { createLogger } from "../../shared/logging.ts";
