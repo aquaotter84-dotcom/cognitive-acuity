@@ -1,3 +1,5 @@
+import { base44 } from '@/api/base44Client';
+
 // Client-side document/input analysis pipeline.
 // Routes any uploaded/imported file through the right extraction path:
 //  - audio  → TranscribeAudio (speech-to-text)
@@ -8,15 +10,32 @@
 const RUNTIME_URL = (import.meta.env.VITE_COGNOS_RUNTIME_URL || '').replace(/\/$/, '');
 
 async function externalLLM(payload) {
-  if (!RUNTIME_URL) throw new Error('VITE_COGNOS_RUNTIME_URL is not configured');
-  const response = await fetch(`${RUNTIME_URL}/api/llm`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload)
-  });
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(data?.error || `Runtime LLM request failed (${response.status})`);
-  return data;
+  // Preference is controlled by a client-side toggle stored in localStorage (key: cognos_use_external_runtime).
+  // When enabled, the frontend will call the external runtime directly (requires VITE_COGNOS_RUNTIME_URL).
+  // Otherwise, the frontend will invoke the Base44 function bridge (externalLLM) so requests are proxied through Base44.
+  const preferExternal = typeof window !== 'undefined' && localStorage.getItem('cognos_use_external_runtime') === 'true';
+
+  if (preferExternal) {
+    if (!RUNTIME_URL) throw new Error('VITE_COGNOS_RUNTIME_URL is not configured');
+    const response = await fetch(`${RUNTIME_URL}/api/llm`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data?.error || `Runtime LLM request failed (${response.status})`);
+    return data;
+  }
+
+  // Fallback: call the Base44 function which proxies to the runtime from the server-side (avoids embedding secrets in the client).
+  try {
+    const res = await base44.functions.invoke('externalLLM', payload);
+    // base44.functions.invoke returns an object with .data property when successful; mirror previous behavior.
+    return res?.data ?? res;
+  } catch (e) {
+    // Normalize error shape similar to direct fetch path.
+    throw new Error(e?.data?.error || e?.message || 'External LLM invocation failed');
+  }
 }
 
 export function categorizeFile(name, mime) {
