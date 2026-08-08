@@ -1,4 +1,5 @@
 import http from "node:http";
+import { runCouncil } from "./council.js";
 
 const port = Number(process.env.PORT || 3000);
 
@@ -22,21 +23,25 @@ const server = http.createServer(async (req, res) => {
 
     if (req.method === "POST" && req.url === "/api/council") {
       const input = await readJson(req);
+      if (typeof input.userMessage !== "string" || !input.userMessage.trim()) {
+        return sendJson(res, 400, { error: "userMessage is required" });
+      }
 
-      return sendJson(res, 501, {
-        error: "Council runtime not wired yet",
-        next: "Connect the existing COGNOS shared/council pipeline without modifying the Base44 implementation.",
-        received: {
-          hasUserMessage: typeof input.userMessage === "string",
-          historyCount: Array.isArray(input.history) ? input.history.length : 0,
-          memoryCount: Array.isArray(input.memories) ? input.memories.length : 0
-        }
+      const result = await runCouncil({
+        userMessage: input.userMessage,
+        history: Array.isArray(input.history) ? input.history : [],
+        memories: Array.isArray(input.memories) ? input.memories : [],
+        workspace: input.workspace ?? null,
+        style: input.style ?? null
       });
+
+      return sendJson(res, 200, result);
     }
 
     return sendJson(res, 404, { error: "Not found" });
   } catch (error) {
-    return sendJson(res, 400, { error: String(error?.message || error) });
+    console.error(error);
+    return sendJson(res, 500, { error: String(error?.message || error) });
   }
 });
 
