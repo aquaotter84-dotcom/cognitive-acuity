@@ -1,10 +1,15 @@
 // Client-side document/input analysis pipeline.
 // Routes any uploaded/imported file through the right extraction path:
 //  - audio  → TranscribeAudio (speech-to-text)
-//  - image  → InvokeLLM vision (file_urls) → description
+//  - image  → external BluesMinds vision (file_urls) → description
 //  - docs / spreadsheets / pdfs / csv / json / html → ExtractDataFromUploadedFile → text
-// Then an InvokeLLM pass produces an AI analysis/summary of the extracted content.
+// Then an external BluesMinds pass produces an AI analysis/summary of the extracted content.
 import { base44 } from '@/api/base44Client';
+
+async function externalLLM(payload) {
+  const result = await base44.functions.invoke('externalLLM', payload);
+  return result?.data ?? result;
+}
 
 export function categorizeFile(name, mime) {
   const m = (mime || '').toLowerCase();
@@ -55,17 +60,22 @@ export async function extractContent({ file_url, name, file_type, mime_type }) {
 export async function analyzeFile({ file_url, name, file_type, extracted_content }) {
   try {
     if (file_type === 'image' && file_url) {
-      const res = await base44.integrations.Core.InvokeLLM({
-        prompt: `Analyze this image in detail. Describe what it shows, any text visible, context, and key observations. The file is named "${name}".`,
+      const res = await externalLLM({
+        messages: [
+          { role: 'user', content: `Analyze this image in detail. Describe what it shows, any text visible, context, and key observations. The file is named "${name}".` }
+        ],
         file_urls: [file_url]
       });
-      return typeof res === 'string' ? res : (res?.response || res?.text || JSON.stringify(res));
+      return typeof res === 'string' ? res : (res?.choices?.[0]?.message?.content || res?.response || res?.text || JSON.stringify(res));
     }
     const body = (extracted_content || '').slice(0, 12000) || '(no extractable text content)';
-    const res = await base44.integrations.Core.InvokeLLM({
-      prompt: `You are an analyst. Analyze the following content extracted from a file named "${name}". Provide a clear, structured summary and highlight key insights, entities, and anything noteworthy.\n\nCONTENT:\n${body}`
+    const res = await externalLLM({
+      messages: [
+        { role: 'system', content: 'You are an analyst. Analyze file content and provide a clear, structured summary, key insights, entities, and anything noteworthy.' },
+        { role: 'user', content: `Analyze the following content extracted from a file named "${name}".\n\nCONTENT:\n${body}` }
+      ]
     });
-    return typeof res === 'string' ? res : (res?.response || res?.text || JSON.stringify(res));
+    return typeof res === 'string' ? res : (res?.choices?.[0]?.message?.content || res?.response || res?.text || JSON.stringify(res));
   } catch (e) {
     console.warn('analyzeFile failed:', e);
     return '';
@@ -73,7 +83,7 @@ export async function analyzeFile({ file_url, name, file_type, extracted_content
 }
 
 // Used by chat to fold attachment content into the user message before orchestration.
-// Images are described via vision, audio is transcribed, documents are extracted.
+// Images are described via external BluesMinds vision, audio is transcribed, documents are extracted.
 export async function extractAttachmentContext(attachments) {
   if (!attachments?.length) return '';
   const parts = [];
@@ -81,11 +91,13 @@ export async function extractAttachmentContext(attachments) {
     const ft = categorizeFile(a.name, a.file_type);
     try {
       if (ft === 'image' && a.file_url) {
-        const res = await base44.integrations.Core.InvokeLLM({
-          prompt: `Describe this image concisely, including any visible text. Filename: ${a.name}.`,
+        const res = await externalLLM({
+          messages: [
+            { role: 'user', content: `Describe this image concisely, including any visible text. Filename: ${a.name}.` }
+          ],
           file_urls: [a.file_url]
         });
-        const desc = typeof res === 'string' ? res : (res?.response || JSON.stringify(res));
+        const desc = typeof res === 'string' ? res : (res?.choices?.[0]?.message?.content || res?.response || JSON.stringify(res));
         if (desc) parts.push(`[Attached image: ${a.name}]\n${desc}`);
       } else if (ft === 'audio' && a.file_url) {
         const res = await base44.integrations.Core.TranscribeAudio({ audio_url: a.file_url });
