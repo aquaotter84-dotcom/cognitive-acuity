@@ -1,13 +1,3 @@
-// Shared LLM utilities — routes model calls through Base44's built-in InvokeLLM
-// integration (platform-managed key), so the app needs no external API key or credits.
-// Used by the council operators and the memory stage.
-//
-// InvokeLLM takes a single prompt string (not a message array), so chat messages are
-// flattened. When responseJsonSchema is provided, InvokeLLM returns a parsed object;
-// otherwise it returns a string.
-
-import { withCharter } from "./council/charter.ts";
-
 export async function callLLM(
     ctx,
       {
