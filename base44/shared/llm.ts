@@ -8,41 +8,91 @@
 
 import { withCharter } from "./council/charter.ts";
 
-export async function callLLM(ctx, { messages, responseJsonSchema = null, model = null, file_urls = null, add_context_from_internet = null }) {
-  const prompt = messages
-    .map(m => (m.role === "system" ? m.content : `${m.role === "assistant" ? "Assistant" : "User"}: ${m.content}`))
-    .join("\n\n");
-  const args = { prompt };
-  if (model) args.model = model;
-  if (responseJsonSchema) args.response_json_schema = responseJsonSchema;
-  if (file_urls) args.file_urls = file_urls;
-  if (add_context_from_internet) args.add_context_from_internet = true;
-  const res = await ctx.base44.asServiceRole.integrations.Core.InvokeLLM(args);
-  return res;
-}
+export async function callLLM(
+    ctx,
+      {
+          messages,
+              responseJsonSchema = null,
+                  model = null,
+                      file_urls = null,
+                          add_context_from_internet = null
+                            }
+                            ) {
+                              const apiKey = secrets.BLUESMINDS_API_KEY;
+                                const apiUrl =
+                                    secrets.BLUESMINDS_API_URL ||
+                                        "https://api.bluesminds.com/v1/chat/completions";
+                                          const selectedModel =
+                                              model ||
+                                                  secrets.BLUESMINDS_MODEL;
 
-const STYLE_DIRECTIVES = {
-  balanced: "Communicate in a balanced, clear, neutral tone — helpful and direct.",
-  casual: "Communicate in a casual, warm, conversational tone — friendly and approachable, like a thoughtful peer.",
-  technical: "Communicate in a precise, technical tone — exact terminology, structured and detail-oriented.",
-  strategic: "Communicate in a strategic, executive tone — frame decisions, trade-offs, and implications at a high level."
-};
+                                                    if (!apiKey) {
+                                                        throw new Error("BLUESMINDS_API_KEY is not configured");
+                                                          }
 
-export function styleDirective(style) {
-  return style && STYLE_DIRECTIVES[style] ? `\n\nCOMMUNICATION STYLE: ${STYLE_DIRECTIVES[style]}` : '';
-}
+                                                            if (!selectedModel) {
+                                                                throw new Error("BLUESMINDS_MODEL is not configured");
+                                                                  }
 
-export function buildContextSystemPrompt(workspace, memories, classification, base = 'You are COGNOS, an intelligent AI reasoning assistant. You provide thoughtful, accurate, and helpful responses. Use markdown formatting when appropriate for clarity.', style = null) {
-  let systemPrompt = withCharter(base);
-  if (workspace?.instructions) {
-    systemPrompt += `\n\nWORKSPACE INSTRUCTIONS:\n${workspace.instructions}`;
-  }
-  if (memories && memories.length > 0) {
-    systemPrompt += `\n\nRELEVANT MEMORIES:\n${memories.map(m => `- ${m.content}`).join('\n')}`;
-  }
-  if (classification?.task_type && classification.task_type !== 'conversation') {
-    systemPrompt += `\n\nTASK CONTEXT: The Observer classified this as "${classification.task_type}" (${classification.complexity || 'unknown'} complexity). Tailor your reasoning approach accordingly.`;
-  }
-  systemPrompt += styleDirective(style);
-  return systemPrompt;
-}
+                                                                    const payload = {
+                                                                        model: selectedModel,
+                                                                            messages,
+                                                                                ...(responseJsonSchema
+                                                                                      ? {
+                                                                                                response_format: {
+                                                                                                            type: "json_schema",
+                                                                                                                        json_schema: responseJsonSchema
+                                                                                                                                  }
+                                                                                                                                          }
+                                                                                                                                                : {}),
+                                                                                                                                                  };
+
+                                                                                                                                                    const response = await fetch(apiUrl, {
+                                                                                                                                                        method: "POST",
+                                                                                                                                                            headers: {
+                                                                                                                                                                  "Authorization": `Bearer ${apiKey}`,
+                                                                                                                                                                        "Content-Type": "application/json"
+                                                                                                                                                                            },
+                                                                                                                                                                                body: JSON.stringify(payload)
+                                                                                                                                                                                  });
+
+                                                                                                                                                                                    const text = await response.text();
+
+                                                                                                                                                                                      let data;
+                                                                                                                                                                                        try {
+                                                                                                                                                                                            data = JSON.parse(text);
+                                                                                                                                                                                              } catch {
+                                                                                                                                                                                                  throw new Error(
+                                                                                                                                                                                                        `BluesMinds returned invalid JSON (${response.status})`
+                                                                                                                                                                                                            );
+                                                                                                                                                                                                              }
+
+                                                                                                                                                                                                                if (!response.ok) {
+                                                                                                                                                                                                                    throw new Error(
+                                                                                                                                                                                                                          `BluesMinds request failed (${response.status}): ${
+                                                                                                                                                                                                                                  data?.error?.message ||
+                                                                                                                                                                                                                                          data?.error ||
+                                                                                                                                                                                                                                                  "Unknown error"
+                                                                                                                                                                                                                                                        }`
+                                                                                                                                                                                                                                                            );
+                                                                                                                                                                                                                                                              }
+
+                                                                                                                                                                                                                                                                if (responseJsonSchema) {
+                                                                                                                                                                                                                                                                    const content = data?.choices?.[0]?.message?.content;
+
+                                                                                                                                                                                                                                                                        if (typeof content === "string") {
+                                                                                                                                                                                                                                                                              try {
+                                                                                                                                                                                                                                                                                      return JSON.parse(content);
+                                                                                                                                                                                                                                                                                            } catch {
+                                                                                                                                                                                                                                                                                                    throw new Error(
+                                                                                                                                                                                                                                                                                                              "BluesMinds returned JSON-schema content that could not be parsed"
+                                                                                                                                                                                                                                                                                                                      );
+                                                                                                                                                                                                                                                                                                                            }
+                                                                                                                                                                                                                                                                                                                                }
+
+                                                                                                                                                                                                                                                                                                                                    return content;
+                                                                                                                                                                                                                                                                                                                                      }
+
+                                                                                                                                                                                                                                                                                                                                        return data?.choices?.[0]?.message?.content ?? "";
+                                                                                                                                                                                                                                                                                                                                        }
+)
