@@ -1,6 +1,7 @@
 // Configuration system — central system configuration.
-// LLM calls route through Base44's built-in InvokeLLM integration (platform-managed
-// key), so no external API key or credits are required. Model names are InvokeLLM IDs.
+// Council LLM calls use the shared BluesMinds HTTP adapter. Model names are
+// BluesMinds/OpenAI-compatible model identifiers and can be overridden by the
+// runtime environment where the external adapter is deployed.
 
 export function getSystemConfig() {
   return Object.freeze({
