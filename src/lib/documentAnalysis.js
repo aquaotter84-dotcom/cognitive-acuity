@@ -4,11 +4,19 @@
 //  - image  → external BluesMinds vision (file_urls) → description
 //  - docs / spreadsheets / pdfs / csv / json / html → ExtractDataFromUploadedFile → text
 // Then an external BluesMinds pass produces an AI analysis/summary of the extracted content.
-import { base44 } from '@/api/base44Client';
+
+const RUNTIME_URL = (import.meta.env.VITE_COGNOS_RUNTIME_URL || '').replace(/\/$/, '');
 
 async function externalLLM(payload) {
-  const result = await base44.functions.invoke('externalLLM', payload);
-  return result?.data ?? result;
+  if (!RUNTIME_URL) throw new Error('VITE_COGNOS_RUNTIME_URL is not configured');
+  const response = await fetch(`${RUNTIME_URL}/api/llm`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data?.error || `Runtime LLM request failed (${response.status})`);
+  return data;
 }
 
 export function categorizeFile(name, mime) {
