@@ -1,7 +1,13 @@
-const ALLOWED_METHODS = new Set(["POST"]);
+const ALLOWED_METHODS = new Set(["POST", "OPTIONS"]);
 
 function json(res, status, body) {
   res.status(status).json(body);
+}
+
+function setCors(res) {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, X-Cognos-Runtime-Secret");
+  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
 }
 
 function buildMessages(messages, fileUrls) {
@@ -34,8 +40,14 @@ function buildMessages(messages, fileUrls) {
 }
 
 export default async function handler(req, res) {
+  setCors(res);
+
+  if (req.method === "OPTIONS") {
+    return res.status(204).end();
+  }
+
   if (!ALLOWED_METHODS.has(req.method)) {
-    res.setHeader("Allow", "POST");
+    res.setHeader("Allow", "POST, OPTIONS");
     return json(res, 405, { error: "Method not allowed" });
   }
 
